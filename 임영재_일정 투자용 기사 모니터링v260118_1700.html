@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>투자 통합 모니터링 대시보드 (v3.5_Full_Edit)</title>
+    <style>
+        :root { --primary: #004085; --naver: #03cf5d; --google: #4285f4; --bg: #f4f7fa; --scrap: #ffc107; --danger: #e63946; --custom: #6f42c1; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 12px; height: 100vh; overflow: hidden; }
+        
+        .dashboard-grid { display: grid; grid-template-columns: 320px 340px 340px 1fr; grid-template-rows: 1fr 220px; gap: 12px; height: calc(100vh - 24px); }
+        .column { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
+        .card { background: #fff; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; height: 100%; min-height: 0; }
+        .title { font-size: 1.05rem; font-weight: bold; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+
+        .sort-select { padding: 2px 4px; font-size: 0.75rem; border-radius: 4px; border: 1px solid #ddd; outline: none; cursor: pointer; background: #fafafa; }
+
+        .mode-switch-container { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: bold; color: #555; background: #f8f9fa; padding: 5px 10px; border-radius: 20px; border: 1px solid #ddd; }
+        .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--custom); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        .date-presets { display: flex; gap: 4px; margin-bottom: 8px; }
+        .btn-preset { flex: 1; padding: 5px; font-size: 0.7rem; border: 2px solid #999; background: #f8f9fa; border-radius: 4px; cursor: pointer; }
+        .date-filter { display: flex; gap: 4px; margin-bottom: 10px; background: #333; padding: 8px; border-radius: 8px; align-items: center; color: white; }
+        .date-filter input { flex: 1; padding: 5px; border: none; border-radius: 4px; font-size: 0.75rem; text-align: center; outline: none; }
+        
+        .keyword-management { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding: 10px; background: #f1f3f5; border-radius: 8px; }
+        .keyword-row { display: flex; gap: 4px; }
+        .keyword-row input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.8rem; }
+        .btn-admin { background: #6c757d; color: white; border: none; border-radius: 4px; padding: 5px 8px; cursor: pointer; font-size: 0.65rem; }
+
+        .filter-group { flex-grow: 1; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 4px; }
+        .keyword-item { display: flex; align-items: center; gap: 4px; width: 100%; }
+        .filter-btn { flex: 1; padding: 9px 10px; border: 1px solid #ddd; background: #fff; border-radius: 6px; font-size: 0.8rem; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .filter-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: bold; }
+        .filter-btn.is-custom { border-left: 4px solid var(--custom); }
+        .filter-btn.is-custom.active { background: var(--custom); border-color: var(--custom); }
+        
+        .kw-actions { display: flex; gap: 2px; }
+        .btn-kw-tool { padding: 4px 6px; font-size: 0.65rem; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer; }
+        .btn-kw-tool:hover { background: #eee; }
+
+        .btn-tool { padding: 6px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+
+        .query-section { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ccc; }
+        #currentQueryInput { width: 100%; padding: 10px; border: 2px solid var(--primary); border-radius: 6px; font-size: 0.85rem; margin-bottom: 8px; outline: none; background: #fff; }
+
+        .local-search { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.8rem; background: #fafafa; outline: none; border-left: 4px solid #007bff; }
+        .scroll-area { flex-grow: 1; overflow-y: auto; padding-right: 5px; position: relative; }
+        .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; justify-content: center; padding-top: 50px; font-weight: bold; color: var(--primary); z-index: 10; }
+
+        .item { padding: 12px 10px; border-bottom: 1px solid #f1f1f1; cursor: pointer; border-radius: 6px; position: relative; transition: 0.2s; }
+        .item:hover { background-color: #f0f4f8; }
+        .item.selected { background-color: #e7f1ff; border-left: 4px solid var(--primary); }
+        .item-title { font-size: 0.88rem; font-weight: bold; line-height: 1.45; margin-bottom: 5px; color: #222; padding-right: 65px; word-break: break-all; }
+        
+        .hl { color: var(--danger); background: #fff0f0; padding: 0 1px; border-radius: 2px; text-decoration: underline; font-weight: 800; }
+        .press-badge { color: #d32f2f; font-weight: 600; background: #fff5f5; padding: 1px 4px; border-radius: 3px; border: 1px solid #ffebeb; font-size: 0.7rem; }
+        
+        .item-actions { position: absolute; top: 10px; right: 8px; display: flex; gap: 5px; z-index: 100; }
+        .btn-action-small { background: #fff; border: 1px solid #ddd; border-radius: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.85rem; }
+        .btn-scrap.active { color: var(--scrap); border-color: var(--scrap); background: #fffdf0; }
+
+        .preview-container { flex-grow: 1; position: relative; background: #fff; overflow: hidden; border: 1px solid #ddd; border-radius: 0 0 12px 12px; }
+        #previewFrame { width: 133.33%; height: 133.33%; border: none; transform: scale(0.75); transform-origin: 0 0; position: absolute; top: 0; left: 0; }
+
+        .scrap-area { grid-column: span 4; background: #fff; border-radius: 12px; padding: 15px; border-top: 4px solid var(--scrap); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .scrap-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; flex-grow: 1; }
+        .scrap-card { min-width: 320px; max-width: 320px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; padding: 12px; position: relative; }
+        .scrap-card-title { font-size: 0.82rem; font-weight: bold; line-height: 1.35; margin-bottom: 5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .scrap-memo { width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.75rem; background: #fff; outline: none; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-grid">
+    <div class="column">
+        <div class="card">
+            <div class="title">🎯 투자 모니터링
+                <div class="mode-switch-container"><span>커스텀</span>
+                    <label class="switch"><input type="checkbox" id="customModeToggle" onchange="setCustomView(this.checked)"><span class="slider"></span></label>
+                </div>
+            </div>
+            <div class="date-presets">
+                <button class="btn-preset" onclick="setDatePreset(0)">오늘</button>
+                <button class="btn-preset" onclick="setDatePreset(2)">3일</button>
+                <button class="btn-preset" onclick="setDatePreset(6)">1주일</button>
+            </div>
+            <div class="date-filter">
+                <input type="date" id="startDate"><span>~</span><input type="date" id="endDate">
+                <button onclick="fetchAll()" class="btn-search" style="padding:4px 10px; cursor:pointer;">🔍</button>
+            </div>
+            <div class="keyword-management">
+                <div class="keyword-row"><input type="text" id="newKeywordInput" placeholder="새 카테고리 추가..."><button onclick="addKeyword()" class="btn-tool" style="background:var(--primary); color:white;">추가</button></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 4px;">
+                    <button class="btn-admin" onclick="exportKeywords()">📥 내보내기</button>
+                    <button class="btn-admin" onclick="importKeywords()">📤 가져오기</button>
+                    <button class="btn-admin" style="background:var(--danger)" onclick="resetToDefault()">🔄 리셋</button>
+                </div>
+            </div>
+            <div class="filter-group" id="keywordListContainer"></div>
+            <div class="query-section">
+                <input type="text" id="currentQueryInput" placeholder="쿼리 직접 수정">
+                <button onclick="fetchAll()" style="width:100%; padding:12px; background:#e63946; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">새 결과 탐색</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 네이버 컬럼 -->
+    <div class="column">
+        <div class="card">
+            <div class="title" style="color:var(--naver)">
+                🟢 네이버 뉴스
+                <select id="naverSortSelect" class="sort-select" onchange="fetchAll()">
+                    <option value="sim">관련도순</option>
+                    <option value="desc" selected>최신순</option>
+                    <option value="asc">오래된순</option>
+                </select>
+            </div>
+            <input type="text" class="local-search" data-target="naverList" placeholder="결과 내 검색..." onkeyup="reSearchList(this)">
+            <div class="scroll-area" id="naverArea">
+                <div class="loading-overlay" id="naverLoading">데이터 수집 중...</div>
+                <div id="naverList"></div>
+            </div>
+        </div>
+    </div>
+    <!-- 구글 컬럼 -->
+    <div class="column">
+        <div class="card">
+            <div class="title" style="color:var(--google)">
+                🔵 구글 뉴스
+                <select id="googleSortSelect" class="sort-select" onchange="fetchAll()">
+                    <option value="sim">관련도순</option>
+                    <option value="desc" selected>최신순</option>
+                    <option value="asc">오래된순</option>
+                </select>
+            </div>
+            <input type="text" class="local-search" data-target="googleList" placeholder="결과 내 검색..." onkeyup="reSearchList(this)">
+            <div class="scroll-area" id="googleArea">
+                <div class="loading-overlay" id="googleLoading">데이터 수집 중...</div>
+                <div id="googleList"></div>
+            </div>
+        </div>
+    </div>
+    <div class="column">
+        <div class="card" style="padding:0; border:none;">
+            <div style="padding:10px 15px; background:#343a40; color:white; display:flex; justify-content:space-between; align-items:center; border-radius:12px 12px 0 0;">
+                <span id="previewTitle" style="font-size:0.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:75%;">기사를 선택하세요</span>
+                <button onclick="window.open(document.getElementById('previewFrame').src)" style="font-size:0.7rem; background:#555; color:white; border:none; padding:2px 8px; cursor:pointer;">새창열기</button>
+            </div>
+            <div class="preview-container"><iframe id="previewFrame" src="about:blank"></iframe></div>
+        </div>
+    </div>
+    <div class="scrap-area">
+        <div class="title" style="border:none; margin-bottom:5px;"><span>⭐ 스크랩 보관함</span>
+            <div><button onclick="copyScrapReport()" style="background:var(--primary); color:#fff; border:none; padding:5px 15px; border-radius:4px; cursor:pointer; font-size:0.8rem;">📋 보고서 복사</button><button onclick="clearScrap()" style="margin-left:5px; padding:5px 10px; cursor:pointer; font-size:0.8rem;">🗑️ 비우기</button></div>
+        </div>
+        <div class="scrap-list" id="scrapList"></div>
+    </div>
+</div>
+
+<script>
+    const OID_MAP = {'001':'연합뉴스','422':'연합뉴스TV','003':'내일신문','005':'국민일보','006':'미디어오늘','020':'동아일보','021':'문화일보','022':'세계일보','023':'조선일보','025':'중앙일보','028':'한겨레','032':'경향신문','081':'서울신문','088':'매일신문','009':'매일경제','011':'서울경제','014':'파이낸셜뉴스','015':'한국경제','016':'헤럴드경제','018':'이데일리','277':'아시아경제','366':'조선비즈','052':'YTN','055':'SBS','056':'KBS','057':'YTN','214':'MBC','437':'JTBC','448':'TV조선','449':'채널A','030':'전자신문','031':'아이뉴스24','092':'ZDNet Korea','138':'디지털데일리','140':'CIO Korea','293':'블로터','119':'데일리안','037':'주간동아','308':'코메디닷컴','346':'헬스조선','421':'뉴스1','469':'한국일보','417':'뉴스핌','447':'뉴스웨이','353':'중앙SUNDAY'};
+    const DOMAIN_ALIAS = {'hankyung':'한국경제','mk':'매일경제','sedaily':'서울경제','edaily':'이데일리','fnnews':'파이낸셜뉴스','asiae':'아시아경제','biz.chosun':'조선비즈','heraldcorp':'헤럴드경제','mt':'머니투데이','chosun':'조선일보','donga':'동아일보','hani':'한겨레','khan':'경향신문','joongang':'중앙일보','seoul':'서울신문','kukinews':'국민일보','segye':'세계일보','munhwa':'문화일보','news1':'뉴스1','hankookilbo':'한국일보','ytn':'YTN','sbs':'SBS','kbs':'KBS','imbc':'MBC','jtbc':'JTBC','tvchosun':'TV조선','ichannela':'채널A','zdnet':'ZDNet Korea','ddaily':'디지털데일리','bloter':'블로터','cio':'CIO Korea','etnews':'전자신문','dailian':'데일리안','ohmynews':'오마이뉴스','pressian':'프레시안','mediatoday':'미디어오늘','sisain':'시사IN','newstapa':'뉴스타파'};
+
+
+    const FIXED_HIGHLIGHTS = ["1일","2일","3일","4일","5일","6일","7일","8일","9일","10일","11일","12일","13일","14일","15일","16일","17일","18일","19일","20일","21일","22일","23일","24일","25일","26일","27일","28일","29일","30일","31일","월초","월 초","월중","월말","월 말","이달","이달 초","이달초","이달 중","이달 중순","이달중순","이달 말","이달말","다음달","다음 달","내달","내 달","1분기","2분기","3분기","4분기","분기말","분기 말","상반기","하반기","연말","연내","내년","최초","최대","최고","수주","계약","M&A","인수","합병","독점","공급","상장","유상증자","횡령","배임","특허","세계 최초","국내 최초","사상 최대","최대 흥행","1위","점유율","독보적","원천 기술","대규모 수주","대규모 공급","글로벌 제휴","글로벌 계약","기술 수출","기술 이전","해외 진출","수출 본격화","업무 협약","MOU","오일머니","규제 개혁","규제 폐지","정부 지원","정부 신사업","국책 과제","세제 혜택","예타 통과","법안 통과","K-뉴딜","대규모 투자","수십 조 투자","공장 증설","설비 투자","생산 라인 확대","국산화 성공","지분 투자","자금 조달","양산","자사주 매입","자사주 소각","배당 확대","무상 증자","주주 친화","밸류업","저PBR","액면 분할","재상장","경영권 분쟁","지분 매각","매각 대금","자회사 상장","IPO","출시","발표","컴백","공개","데뷔","개봉","신작","티저","라인업","대주주 매도","경영진 매도","계약 해지","매각 철회","무상감자","자사주 매각","거래 정지","소송","신용 등급 하락"];
+    
+    const DEFAULT_KEYWORDS = [
+        { label: "1. 월초/상순 (1~20일)", query: "1일 | 2일 | 3일 | 4일 | 5일 | 6일 | 7일 | 8일 | 9일 | 10일 | 11일 | 12일 | 13일 | 14일 | 15일 | 16일 | 17일 | 18일 | 19일 | 20일 | 월초 | 월 초 | 이달 초 | 이달초 | 월중" },
+        { label: "2. 월말/하순 (21~31일)", query: "21일 | 22일 | 23일 | 24일 | 25일 | 26일 | 27일 | 28일 | 29일 | 30일 | 31일 | 이달 말 | 이달말 | 월 말 | 월말 | 이달 중순 | 이달중순 | 이달 중 | 다음달 | 다음 달 | 내달 | 내 달" },
+        { label: "3. 분기/연간", query: "1분기 | 2분기 | 3분기 | 4분기 | 분기말 | 분기 말 | 상반기 | 하반기 | 연말 | 연내 | 내년" },
+        { label: "4. 시장선점/최초/최고", query: "국내 최초 | 세계 최초 | 사상 최대 | 최대 흥행 | 세계 1위 | 미국 1위 | 중국 1위 | 일본 1위 | 유럽 1위 | 아마존 1위 | 티몰 1위 | 타오바오 1위 | 징동닷컴 1위 | 알리 1위 | 구글스토어 1위 | 애플스토어 1위 | 점유율 1위 | 독점 공급 | 독보적 | 원천 기술" },
+        { label: "5. 수주/계약/글로벌진출", query: "공급 계약 | 대규모 공급 | 대규모 수주 | 상용화 추진 | 상용화 임박 | 특허 확보 | 특허 상용화 | 특허 취득 | 글로벌 제휴 | 사업 진출 | 기술 수출 | 기술 이전 | 글로벌 계약 체결 | 오일머니 | 업무 협약 | MOU 체결 | 해외 진출 | 수출 본격화" },
+        { label: "6. 정부정책/규제개혁", query: "규제 개혁 | 규제 폐지 | 반사 수혜 | 정부 신사업 | 정부 지원 | 국책 과제 | 세제 혜택 | 예타 통과 | 법안 통과 | K-뉴딜" },
+        { label: "7. 대규모 투자/성공", query: "수십 조 투자 | 시설 자금 | 공장 증설 | 설비 투자 | 생산 라인 확대 | 국산화 성공 | 지분 투자 | 자금 조달 | 양산 시작" },
+        { label: "8. 주주환원/밸류업", query: "자사주 매입 | 자사주 소각 | 배당 확대 | 무상 증자 | 주주 친화 | 밸류업 | 저PBR | 액면 분할 | 재상장" },
+        { label: "9. M&A/지배구조", query: "인수 합병 | M&A 추진 | 매각 대금 | 지분 매각 | 경영권 분쟁 | 자회사 상장 | IPO 대어 | 지배구조 개선" },
+        { label: "10. 출시/발표 (이벤트)", query: "출시 | 발표 | 컴백 | 공개 | 데뷔 | 개봉 | 신작 | 티저 공개 | 베일 벗다 | 라인업" },
+        { label: "11. 투자 위험 (악재)", query: "경영진 주식 매도 | 경영진 지분 매도 | 대주주 매도 | 매각 철회 | 계약 해지 | 대규모 유상증자 | 주주배정 유상증자 | 유증 | 무상감자 | 자사주 매각 | 거래 정지 | 횡령 | 배임 | 소송 제기 | 신용 등급 하락" }
+    ];
+
+    const PROXY = "https://corsproxy.io/?";
+    const NAVER_ID = 'psW8xkUHR2KH4qPK9eBH', NAVER_SECRET = '_8eXzLfqva';
+
+    let showCustom = localStorage.getItem('showCustom') === 'true';
+    let baseKeywords = JSON.parse(localStorage.getItem('base_keywords_v3')) || [...DEFAULT_KEYWORDS];
+    let userKeywords = JSON.parse(localStorage.getItem('user_keywords_v3')) || [];
+    let scraps = JSON.parse(localStorage.getItem('invest_scraps_v3')) || [];
+    let activeIdx = 0, isActiveUserItem = false;
+    window.articleCache = {};
+
+    function setCustomView(enabled) { showCustom = enabled; localStorage.setItem('showCustom', enabled); renderKeywords(); }
+
+    function renderKeywords() {
+        const container = document.getElementById('keywordListContainer');
+        
+        // 버튼 HTML을 생성하는 공통 함수
+        const getKwdHtml = (k, idx, isUser) => {
+            const isActive = (isUser === isActiveUserItem && idx === activeIdx);
+            return `
+            <div class="keyword-item">
+                <button class="filter-btn ${isUser ? 'is-custom' : ''} ${isActive ? 'active' : ''}" onclick="selectKeyword(${idx}, ${isUser})">
+                    ${k.label}
+                </button>
+                ${showCustom ? `
+                <div class="kw-actions">
+                    <button class="btn-kw-tool" title="편집" onclick="editKeyword(${idx}, ${isUser})">✏️</button>
+                    <button class="btn-kw-tool" title="삭제" onclick="deleteKeyword(${idx}, ${isUser})">❌</button>
+                </div>` : ''}
+            </div>`;
+        };
+
+        // 기본 키워드 섹션
+        let html = baseKeywords.map((k, idx) => getKwdHtml(k, idx, false)).join('');
+
+        // 커스텀 키워드 섹션 (사용자 추가분)
+        if (showCustom && userKeywords.length > 0) {
+            html += `<div style="font-size:0.6rem; color:#999; margin:10px 0 5px 5px; border-top:1px solid #eee; padding-top:10px;">MY CATEGORY</div>`;
+            html += userKeywords.map((k, idx) => getKwdHtml(k, idx, true)).join('');
+        }
+        
+        container.innerHTML = html;
+        localStorage.setItem('base_keywords_v3', JSON.stringify(baseKeywords));
+        localStorage.setItem('user_keywords_v3', JSON.stringify(userKeywords));
+        document.getElementById('customModeToggle').checked = showCustom;
+    }
+
+    function selectKeyword(idx, isUser) { 
+        activeIdx = idx; isActiveUserItem = isUser;
+        const targetList = isUser ? userKeywords : baseKeywords;
+        if(targetList[idx]) document.getElementById('currentQueryInput').value = targetList[idx].query;
+        renderKeywords(); fetchAll(); 
+    }
+
+    function addKeyword() {
+        const v = document.getElementById('newKeywordInput').value.trim();
+        if(v) { 
+            userKeywords.push({ label: v, query: v }); 
+            document.getElementById('newKeywordInput').value = ""; 
+            showCustom = true;
+            localStorage.setItem('showCustom', true);
+            renderKeywords(); 
+        }
+    }
+
+    function editKeyword(idx, isUser) {
+        const list = isUser ? userKeywords : baseKeywords;
+        const k = list[idx];
+        const newLabel = prompt("카테고리 이름을 수정하세요:", k.label);
+        if (newLabel === null) return;
+        const newQuery = prompt("검색 쿼리를 수정하세요:", k.query);
+        if (newQuery === null) return;
+        
+        list[idx] = { label: newLabel, query: newQuery };
+        renderKeywords();
+        if (isActiveUserItem === isUser && activeIdx === idx) selectKeyword(idx, isUser);
+    }
+
+    function deleteKeyword(idx, isUser) {
+        const list = isUser ? userKeywords : baseKeywords;
+        if (confirm(`'${list[idx].label}' 카테고리를 삭제하시겠습니까?`)) {
+            list.splice(idx, 1);
+            if (isActiveUserItem === isUser && activeIdx === idx) {
+                activeIdx = 0; isActiveUserItem = false;
+            }
+            renderKeywords();
+        }
+    }
+    
+    function resetToDefault() { if(confirm("모든 설정을 초기화 하시겠습니까?")) { baseKeywords = [...DEFAULT_KEYWORDS]; userKeywords = []; renderKeywords(); selectKeyword(0, false); } }
+    function exportKeywords() { navigator.clipboard.writeText(JSON.stringify({ base: baseKeywords, user: userKeywords })).then(() => alert("설정이 복사되었습니다.")); }
+    function importKeywords() { const d = prompt("설정 데이터 입력:"); if(d) { try { const p = JSON.parse(d); baseKeywords = p.base; userKeywords = p.user; renderKeywords(); } catch(e) { alert("데이터 형식이 올바르지 않습니다."); } } }
+
+    function isWithinDateRange(pubDateStr) {
+        const d = new Date(pubDateStr);
+        if (isNaN(d.getTime())) return false;
+        const art = d.toISOString().split('T')[0];
+        const s = document.getElementById('startDate').value;
+        const e = document.getElementById('endDate').value;
+        return (!s || art >= s) && (!e || art <= e);
+    }
+
+    function applySorting(items, sortMode, isNaver) {
+        if (sortMode === 'sim') return items; 
+        return items.sort((a, b) => {
+            const dateA = new Date(isNaver ? a.pubDate : a.querySelector("pubDate").textContent);
+            const dateB = new Date(isNaver ? b.pubDate : b.querySelector("pubDate").textContent);
+            return sortMode === 'desc' ? dateB - dateA : dateA - dateB;
+        });
+    }
+
+    async function fetchNaver() {
+        const q = document.getElementById('currentQueryInput').value;
+        const startDate = document.getElementById('startDate').value;
+        const sortMode = document.getElementById('naverSortSelect').value;
+        const overlay = document.getElementById('naverLoading');
+        const listContainer = document.getElementById('naverList');
+        
+        overlay.style.display = 'flex';
+        listContainer.innerHTML = '';
+        let allItems = [];
+
+        try {
+            const apiSort = (sortMode === 'sim') ? 'sim' : 'date';
+            for (let start = 1; start <= 901; start += 100) {
+                const ts = Date.now();
+                const apiUrl = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(q)}&display=100&start=${start}&sort=${apiSort}&_ts=${ts}`;
+                const res = await fetch(PROXY + encodeURIComponent(apiUrl), { 
+                    headers: { 'X-Naver-Client-Id': NAVER_ID, 'X-Naver-Client-Secret': NAVER_SECRET } 
+                });
+                const data = await res.json();
+                if (!data.items || data.items.length === 0) break;
+                allItems = allItems.concat(data.items);
+                if (apiSort === 'date') {
+                    const lastDate = new Date(data.items[data.items.length - 1].pubDate).toISOString().split('T')[0];
+                    if (startDate && lastDate < startDate) break;
+                }
+            }
+            const filtered = allItems.filter(i => isWithinDateRange(i.pubDate));
+            const unique = Array.from(new Map(filtered.map(i => [i.link, i])).values());
+            const sorted = applySorting(unique, sortMode, true);
+            listContainer.innerHTML = sorted.map(i => createArticleItem(i, true)).join('') || '<div style="padding:20px; text-align:center;">결과 없음</div>';
+        } catch(e) { console.error(e); }
+        overlay.style.display = 'none';
+    }
+
+    async function fetchGoogle() {
+        let q = document.getElementById('currentQueryInput').value;
+        const s = document.getElementById('startDate').value, e = document.getElementById('endDate').value;
+        const sortMode = document.getElementById('googleSortSelect').value;
+        if(s) q += ` after:${s}`; if(e) q += ` before:${e}`;
+        const overlay = document.getElementById('googleLoading');
+        const listContainer = document.getElementById('googleList');
+        overlay.style.display = 'flex';
+        listContainer.innerHTML = '';
+        try {
+            const res = await fetch(PROXY + encodeURIComponent(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=ko&gl=KR&ceid=KR:ko`));
+            const xml = new DOMParser().parseFromString(await res.text(), "text/xml");
+            const items = Array.from(xml.querySelectorAll("item"));
+            const filtered = items.filter(n => isWithinDateRange(n.querySelector("pubDate").textContent));
+            const sorted = applySorting(filtered, sortMode, false);
+            listContainer.innerHTML = sorted.map(n => createArticleItem(n, false)).join('') || '<div style="padding:20px; text-align:center;">결과 없음</div>';
+        } catch(e) {}
+        overlay.style.display = 'none';
+    }
+
+    function createArticleItem(item, isNaver) {
+        const t = isNaver ? item.title.replace(/<[^>]*>?/gm, '').replace(/&quot;/g, '"') : item.querySelector("title").textContent;
+        const u = isNaver ? item.link : item.querySelector("link").textContent;
+        const desc = isNaver ? item.description.replace(/<[^>]*>?/gm, '').replace(/&quot;/g, '"') : item.querySelector("description").textContent.replace(/<[^>]*>?/gm, '');
+        const pubDate = isNaver ? item.pubDate : item.querySelector("pubDate").textContent;
+        const d = new Date(pubDate).toLocaleDateString();
+        const p = getMediaName(u, isNaver ? null : item.querySelector("source")?.textContent);
+        window.articleCache[u] = { title: t, url: u, press: p, date: d, desc: desc };
+        const isS = scraps.some(s => s.url === u) ? 'active' : '';
+        return `<div class="item" data-url="${u}" onclick="handleItemClick(this)"><div class="item-actions"><button class="btn-action-small btn-scrap ${isS}" onclick="handleScrapClick(event, this)">★</button><button class="btn-action-small" title="새 창 열기" onclick="window.open('${u}','_blank'); event.stopPropagation();">↗</button></div><div class="item-title">${formatHighlight(t)}</div><div class="item-info"><span class="press-badge">${p}</span><span>${d}</span></div></div>`;
+    }
+
+    function getMediaName(u, s) {
+        if(u.includes("naver.com")) {
+            const m = u.match(/article\/(\d{3})\//) || u.match(/oid=(\d{3})/);
+            if (m && OID_MAP[m[1]]) return OID_MAP[m[1]];
+        }
+        if(s) return s;
+        try {
+            const host = new URL(u).hostname.replace('www.', '');
+            const parts = host.split('.');
+            let key = parts[0].toLowerCase();
+            if (['news','m','n','view','biz'].includes(key)) key = parts[1].toLowerCase();
+            return DOMAIN_ALIAS[key] || key.toUpperCase();
+        } catch(e) { return "뉴스"; }
+    }
+
+    function formatHighlight(text, localKwd = "") {
+        let qVal = document.getElementById('currentQueryInput').value;
+        let qKwds = qVal.replace(/[()]/g, '').split('|').map(k => k.trim()).filter(k => k.length > 1);
+        let allKwds = [...new Set([...FIXED_HIGHLIGHTS, ...qKwds])];
+        if (localKwd.length > 1) allKwds.push(localKwd);
+        let res = text;
+        allKwds.sort((a,b) => b.length - a.length).forEach(w => {
+            if(!w) return;
+            res = res.replace(new RegExp(`(${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi"), `<span class="hl">$1</span>`);
+        });
+        return res;
+    }
+
+    function reSearchList(input) {
+        const tid = input.getAttribute('data-target'), val = input.value.toLowerCase();
+        document.getElementById(tid).querySelectorAll('.item').forEach(item => {
+            const d = window.articleCache[item.getAttribute('data-url')];
+            const isMatch = d.title.toLowerCase().includes(val) || d.press.toLowerCase().includes(val) || (d.desc && d.desc.toLowerCase().includes(val));
+            item.style.display = isMatch ? 'block' : 'none';
+            if(isMatch) item.querySelector('.item-title').innerHTML = formatHighlight(d.title, val);
+        });
+    }
+
+    function handleItemClick(el) {
+        const d = window.articleCache[el.getAttribute('data-url')];
+        document.querySelectorAll('.item').forEach(i => i.classList.remove('selected')); el.classList.add('selected');
+        document.getElementById('previewTitle').innerText = d.title;
+        document.getElementById('previewFrame').src = d.url.includes("naver.com") ? d.url.replace("n.news.naver.com", "m.news.naver.com") : d.url;
+    }
+
+    function handleScrapClick(e, btn) {
+        e.stopPropagation(); const u = btn.closest('.item').getAttribute('data-url');
+        const idx = scraps.findIndex(s => s.url === u);
+        if (idx > -1) scraps.splice(idx, 1); else scraps.push({ ...window.articleCache[u], memo: "" });
+        updateScrap();
+    }
+
+    function updateScrap() {
+        localStorage.setItem('invest_scraps_v3', JSON.stringify(scraps));
+        const container = document.getElementById('scrapList');
+        container.innerHTML = scraps.map((s) => `<div class="scrap-card"><button style="position:absolute; top:5px; right:5px; border:none; cursor:pointer;" onclick="removeScrap('${s.url}')">✕</button><div onclick="window.open('${s.url}')" class="scrap-card-title">${s.title}</div><div style="font-size:0.7rem; color:#888;">${s.press} | ${s.date}</div><input type="text" class="scrap-memo" placeholder="비고 입력..." value="${s.memo || ''}" oninput="saveMemo('${s.url}', this.value)"></div>`).join('');
+        document.querySelectorAll('.btn-scrap').forEach(btn => {
+            const item = btn.closest('.item');
+            if (item) btn.classList.toggle('active', scraps.some(s => s.url === item.getAttribute('data-url')));
+        });
+    }
+
+    function saveMemo(u, t) { const idx = scraps.findIndex(s => s.url === u); if(idx > -1) { scraps[idx].memo = t; localStorage.setItem('invest_scraps_v3', JSON.stringify(scraps)); } }
+    function removeScrap(u) { scraps = scraps.filter(s => s.url !== u); updateScrap(); }
+    function clearScrap() { if(confirm("스크랩을 모두 비우시겠습니까?")) { scraps = []; updateScrap(); } }
+    function copyScrapReport() {
+        const text = scraps.map((s, i) => `${i+1}. [${s.press}] ${s.title}\n   링크: ${s.url}\n   비고: ${s.memo || '-'}`).join('\n\n');
+        navigator.clipboard.writeText(text).then(() => alert("보고서가 복사되었습니다."));
+    }
+
+    function setDatePreset(days) {
+        const end = new Date(); const start = new Date(); start.setDate(end.getDate() - days);
+        document.getElementById('startDate').value = start.toISOString().split('T')[0];
+        document.getElementById('endDate').value = end.toISOString().split('T')[0];
+        fetchAll();
+    }
+
+    function fetchAll() { 
+        document.querySelectorAll('.local-search').forEach(i => i.value = ''); 
+        window.articleCache = {}; 
+        fetchNaver(); fetchGoogle(); 
+    }
+
+    window.onload = () => {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('startDate').value = today; document.getElementById('endDate').value = today;
+        renderKeywords(); updateScrap(); fetchAll();
+    };
+</script>
+</body>
+</html>
