@@ -1,0 +1,3987 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>Research Desk v10.5 (Executive Link-First)</title>
+<style>
+:root{
+  --bg:#f1f5f9; --panel:#ffffff; --line:#cbd5e1; --text:#0f172a;
+  --muted:#64748b; --accent:#2563eb; --accent-light:#dbeafe;
+  --danger:#ef4444; --warning:#f59e0b; --success:#10b981; --white:#ffffff;
+}
+*{box-sizing:border-box; font-family:"Pretendard",-apple-system,sans-serif;}
+body{margin:0; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5;}
+.container{max-width:1400px; margin:0 auto; padding:20px;}
+.header{display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--line); padding-bottom:15px;}
+.sync-monitor{display:flex; gap:15px; align-items:flex-start; background:#e2e8f0; padding:8px 15px; border-radius:12px; transition:.2s;}
+.sync-item {  font-size: 11px;  display: flex;  flex-direction: column;  justify-content: center;   /* 🔑 */  gap: 2px;  color: var(--muted);  min-width: 95px;  min-height: 34px; padding: 6px 0;}
+.sync-item b{font-size:9px;line-height: 1;}
+.sync-item span {  font-family: monospace;  font-weight: 800;  color: var(--text);  line-height: 1.05;   /* 🔧 줄간격 줄이기 */  white-space: pre-line;}
+.sync-warn { background: #ffedd5 !important; border: 2px solid var(--warning) !important; }
+.sync-warn span { color: var(--warning) !important; }
+
+/* 데이터 버전 역전 시 발생하는 위험 알림 */
+.sync-danger { background: #fee2e2 !important; border: 2px solid var(--danger) !important; animation: pulse 1.5s infinite; }
+.sync-danger span { color: var(--danger) !important; }
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+.url-preview-area{margin-top:12px; display:flex; flex-direction:column; gap:6px;}
+.url-card{background:#f8fafc; border:1px solid var(--line); border-radius:8px; display:flex; text-decoration:none; color:inherit; overflow:hidden; transition:.2s; max-width:600px; border-left:4px solid var(--accent); box-shadow:0 2px 4px rgba(0,0,0,.02);}
+.url-card:hover{background:var(--accent-light); border-color:var(--accent); transform:translateY(-1px);}
+.url-thumb{width:120px; min-width:120px; height:70px; background:#eef2f6; display:flex; align-items:center; justify-content:center; overflow:hidden; border-right:1px solid var(--line);}
+.url-thumb img{width:100%; height:100%; object-fit:cover;}
+.url-info{padding:10px 15px; flex:1; overflow:hidden; display:flex; flex-direction:column; justify-content:center;}
+.url-domain{font-size:10px; color:var(--muted); margin-bottom:2px; font-weight:800;}
+.url-title{font-weight:800; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--accent); margin-bottom:3px;}
+.url-snippet{font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.85;}
+.nav-tabs{display:flex; gap:5px; margin-bottom:15px; background:#e2e8f0; padding:5px; border-radius:10px; width:fit-content;}
+.nav-tabs button{padding:8px 18px; border:none; background:none; cursor:pointer; font-weight:800; color:var(--muted); border-radius:7px; transition:.2s;}
+.nav-tabs button.active{background:var(--panel); color:var(--accent); box-shadow:0 2px 4px rgba(0,0,0,.1);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+.main-layout{display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:start;}
+.sidebar{position:sticky; top:20px;}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow:0 4px 6px -1px rgba(0,0,0,.05); margin-bottom:15px;}
+.meta-row{display:grid; grid-template-columns:1.2fr .8fr 115px 1fr 1fr 1fr; gap:10px; margin-bottom:15px; align-items:flex-end;}
+label{display:block; font-size:11px; font-weight:900; color:var(--muted); margin-bottom:4px; text-transform:uppercase;}
+input,textarea,select{  width:100%;  padding:10px;  border:1px solid var(--line);  border-radius:8px;  outline:none;  font-size:16px; /* iOS 필수 */  background:#f8fafc;}
+textarea{resize:vertical;}
+input:focus,textarea:focus,select:focus{border-color:var(--accent); background:var(--white);}
+.btn{padding:7px 12px; border-radius:8px; border:1px solid var(--line); cursor:pointer; font-weight:800; font-size:12px; min-height:34px; /* iOS 권장 터치 */ display:inline-flex; align-items:center; gap:6px; transition:.2s; background:#fff;}
+.btn-primary{background:var(--accent); color:var(--white); border:none;}
+.btn-success{background:var(--success); color:var(--white); border:none;}
+.btn-ghost {  background: transparent;  border: 1px solid var(--line);  color: var(--muted);}
+.btn-mini{padding:4px 8px; font-size:10px; border-radius:6px;}
+.btn:disabled{opacity:.6; cursor:not-allowed;}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; position:relative; transition:.3s; margin-bottom:15px;}
+.card-header{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;}
+.card-title{font-weight:900; color:var(--accent); cursor:pointer; font-size:15px;}
+.card-title:hover{text-decoration:underline;}
+.link-summary{font-size:12px; color:var(--accent); background:var(--accent-light); padding:4px 10px; border-radius:6px; display:inline-block; margin-top:4px; cursor:pointer; font-weight:700;}
+.link-summary:hover{background:var(--accent); color:white;}
+.trade-wrap{margin:10px 0 0; padding:12px; border-radius:10px; border:1px solid var(--success); background:#f0fdf4;}
+.trade-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:8px;}
+.trade-pill{display:inline-flex; gap:10px; font-size:12px; padding:8px; background:#f8fafc; border-radius:8px; border-left:4px solid var(--success);}
+.capture-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:5px;}
+.cap-slot{border:2px dashed var(--line); border-radius:10px; height:150px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start; background:#f8fafc; position:relative; overflow:hidden;}
+.cap-slot img{width:100%; height:90px; object-fit:cover;}
+.cap-note{border:none; border-top:1px solid var(--line); padding:8px; font-size:12px; background:#fff; height:60px; outline:none; resize:none;}
+.cap-remove{position:absolute; top:6px; right:6px; background:var(--danger); color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-weight:900;}
+.tree-item{display:flex; justify-content:space-between; padding:10px; border-radius:8px; cursor:pointer; margin-bottom:4px; font-weight:700;}
+.tree-item.active{background:var(--accent); color:var(--white);}
+.explorer-item{
+  padding:15px;
+  margin-bottom:12px;                 /* ✅ 카드 간격 */
+  border:1px solid var(--line);        /* ✅ 카드 외곽 */
+  border-radius:12px;                  /* ✅ 카드 느낌 */
+  background:#ffffff;
+  transition:.2s;
+  cursor:pointer;
+}
+
+.explorer-item:hover{
+  background:var(--accent-light);
+  border-color:var(--accent);
+}
+.comment-box{margin-top:12px; border-top:1px solid #f1f5f9; padding-top:10px;}
+.comment-item{font-size:14px; line-height:1.6; color:var(--muted); padding:6px 8px; background:#f8fafc; border:1px solid var(--line); border-radius:8px; margin-bottom:6px;}
+.comment-input{display:flex; gap:8px; margin-top:8px;}
+.comment-input input{flex:1;}
+.modal{position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; justify-content:center; align-items:center; z-index:10000; padding:20px;}
+.modal-content{background:var(--white); padding:30px; border-radius:16px; max-width:700px; width:100%; max-height:90vh; overflow-y:auto;}
+.hidden{display:none;}
+@media (max-width: 1024px) {  .main-layout {    grid-template-columns: 1fr;  }  .sidebar {    position: static;  }}
+.file-btn:hover {  background: rgba(16,185,129,0.1);  color: var(--success);  border-color: var(--success);}
+/* 캡쳐 보드 파일 버튼 */
+.cap-file-btn {  margin-top: 4px;  align-self: flex-start;  font-size: 12px;  border-style: dashed;  opacity: 0.85;}
+.cap-file-btn:hover {  background: rgba(37,99,235,0.08);  color: var(--accent);  border-color: var(--accent);  opacity: 1;}
+/* ===============================
+   우측 상단 시스템 버튼
+=============================== */
+.header .btn-ghost {
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+.header .btn-ghost:hover {
+  background: rgba(37,99,235,0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 위험 버튼 (초기화) */
+.header .btn-ghost[style*="--danger"]:hover {
+  background: rgba(239,68,68,0.08);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+
+/* iPad / 터치용 피드백 */
+.url-card:active,
+.tree-item:active,
+.link-summary:active,
+.explorer-item:active,
+.btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+
+
+.tab-content {
+  height: calc(100vh - 100px);
+}
+
+
+/* Report 전용 레이아웃 */
+.report-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+}
+
+/* 좌측 카드 패널 */
+.report-sidebar {
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 120px); /* 헤더 + 탭 높이만 제외 */
+  overflow-y: auto;
+}
+
+/* 우측 편집 영역 */
+.report-editor textarea {
+  min-height: 100px;
+  margin-bottom: 18px;
+}
+
+/* 선택된 카드 박스 */
+.report-entry-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+
+.report-hypothesis {
+  position: relative;
+  padding: 12px 36px 12px 14px;
+  border-left: 4px solid var(--accent);
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.report-hypothesis-title {
+  font-weight: 900;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.report-hypothesis-body {
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.report-hypothesis button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+
+@media print {
+
+  /* 기본 숨김 */
+  body * {
+    visibility: hidden;
+  }
+
+  #content-report,
+  #content-report * {
+    visibility: visible;
+  }
+
+  /* 출력 영역 */
+  #content-report {
+    position: static;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* 🔑 핵심: grid 해제 */
+  .report-layout {
+    display: block !important;
+  }
+
+  /* 좌측 패널 제거 */
+  .report-sidebar,
+  .header,
+  .nav-tabs,
+  button {
+    display: none !important;
+  }
+
+  /* 출력 가독성 */
+  textarea {
+    border: none;
+    resize: none;
+  }
+
+}
+
+.report-section {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.report-section h4 {
+  margin: 0 0 8px;
+}
+
+/* ===============================
+   Report 입력창 확장 (v10.5)
+=============================== */
+
+/* Report 전용 textarea 기본값 */
+#reportEditorBody textarea {
+  min-height: 140px;   /* 기본 높이 */
+  overflow-y: hidden; /* 스크롤바 제거 (JS가 높이 조절) */
+  resize: none;       /* 사용자가 드래그로 조절하지 않게 */
+}
+
+
+
+.meta-pill{
+  font-size:11px;
+  padding:4px 8px;
+  border-radius:6px;
+  background:#f1f5f9;
+  border:1px solid var(--line);
+  margin-right:4px;
+  font-weight:700;
+}
+.meta-pill.sector{ color:#1d4ed8; }
+.meta-pill.tag{ color:#0f766e; }
+
+
+
+/* 알람 입력 필드 정렬 보정 */
+#alarmFields input {
+  font-size: 16px;
+  padding: 10px;
+}
+
+/* 알람 블록 높이 통일 */
+.trade-wrap {
+  min-height: 56px;
+}
+
+
+.alarm-badge{
+  font-size:10px;
+  font-weight:900;
+  padding:3px 7px;
+  border-radius:7px;
+  margin-left:7px;
+  display:inline-block;
+}
+
+.alarm-badge.upcoming{
+  background:#e0f2fe;
+  color:#0369a1;
+}
+
+.alarm-badge.today{
+  background:#fef3c7;
+  color:#92400e;
+}
+
+.alarm-badge.overdue{
+  background:#fee2e2;
+  color:#991b1b;
+}
+
+.alarm-badge.done{
+  background:#ecfeff;
+  color:#065f46;
+}
+
+
+/* Explorer 서브 패널 강조 스타일 */
+.panel-highlight {
+  border: 2px solid;
+  background: #f8fafc;
+}
+
+.panel-highlight.alarm {
+  border-color: var(--warning);
+  background: #fffbeb;
+}
+
+.panel-highlight.review {
+  border-color: var(--success);
+  background: #f0fdf4;
+}
+
+
+
+.hl-mark-url{ background:#dbeafe; }
+.hl-mark-tag{
+  background:#fde047;
+  color:#000;
+  font-weight:900;
+  padding:1px 4px;
+  border-radius:4px;
+}
+.hl-mark-code{ background:#fef3c7; }
+
+
+/* ===============================
+   Markdown Support
+=============================== */
+
+.md-h1 { 
+  font-size:18px; 
+  font-weight:900; 
+  margin:10px 0 6px; 
+  color:var(--accent);
+}
+
+.md-h2 { 
+  font-size:16px; 
+  font-weight:800; 
+  margin:8px 0 4px; 
+  color:#1e40af;
+}
+
+.md-h3 { 
+  font-size:14px; 
+  font-weight:800; 
+  margin:6px 0 4px; 
+}
+
+.md-bold { font-weight:900; }
+
+.md-underline {
+  text-decoration: underline;
+}
+
+.md-italic { font-style:italic; opacity:.85; }
+
+.md-quote {
+  border-left:4px solid var(--accent);
+  padding:6px 10px;
+  background:#f1f5f9;
+  font-size:13px;
+  margin:6px 0;
+}
+
+.md-hr {
+  border-top:1px dashed var(--line);
+  margin:10px 0;
+}
+
+.md-li {
+  padding-left:16px;
+  position:relative;
+  margin:4px 0;
+}
+
+.md-li::before {
+  content:"•";
+  position:absolute;
+  left:0;
+  color:var(--accent);
+}
+
+#reportContainer{
+  height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+
+
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div style="display:flex; align-items:center; gap:20px;">
+      <h2 style="margin:0; color:var(--accent); font-size:22px;">👑 Research Desk</h2>
+      <div id="syncSentinel" class="sync-monitor">
+        <div class="sync-item"><b>Local DB</b> <span id="localLastTs">-</span></div>
+        <div class="sync-item"><b>Import</b> <span id="importLastTs">-</span></div>
+        <div class="sync-item"><b>Export</b> <span id="exportLastTs">-</span></div>
+        <div class="sync-item"><b>Quote Sync</b> <span id="quoteLastTs">-</span></div>
+      </div>
+    </div>
+    <div style="
+  background:rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+  border:1px solid var(--line);
+  padding:8px;
+  border-radius:8px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
+  align-items:flex-start;
+">
+      <button class="btn btn-ghost" onclick="toggleModal('helpModal')">❔ 가이드</button>
+      <button class="btn btn-primary" onclick="exportData()">📤 내보내기</button>
+      <label class="btn btn-ghost" style="margin:0; cursor:pointer;">
+        📥 가져오기 <input type="file" hidden onchange="importData(event)">
+      </label>
+      <button class="btn btn-ghost" style="color:var(--danger)" onclick="resetAll()">⚠️ 초기화</button>
+      <button class="btn btn-ghost" onclick="syncQuotes()">📊 전체 시세 동기화</button>
+    </div>
+  </div>
+
+  <div class="nav-tabs">
+    <button onclick="switchTab('monitor')" id="tab-monitor">📅 일정 투자 모니터링</button>
+    <button onclick="switchTab('desk')" id="tab-desk" class="active">✍️ 분석 데스크</button>
+    <button onclick="switchTab('explorer')" id="tab-explorer">🔍 심화 탐색 및 지식맵</button>
+    <button onclick="switchTab('report')" id="tab-report">  🧾 레포트</button>
+  </div>
+
+  <!-- TAB: DESK -->
+  <div id="content-desk" class="tab-content active">
+    <button class="btn btn-ghost" onclick="toggleInputPanel()" style="margin-bottom:10px;">📝 입력창 토글 (숨김/보임)</button>
+    <div id="inputPanel" class="panel">
+      <div class="meta-row">
+        <div><label>종목명</label><input id="tickerName" placeholder="ex) 삼성전자"></div>
+        <div><label>코드(티커)</label><input id="tickerCode" placeholder="ex) 005930"></div>
+        <button id="lookupBtn" class="btn btn-success btn-lookup" style="padding:10px; width:100%; font-size:11px;" onclick="webMapTicker()">코드 조회</button>
+        <div><label>날짜</label><input id="date" type="date"></div>
+        <div><label>섹터</label><input id="sector" placeholder="ex) 반도체"></div>
+        <div><label>태그</label><input id="tags" placeholder="ex) 실적발표"></div>
+      </div>
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:15px; margin-bottom:10px;">
+        <div>
+          <label>핵심 가설 (Hypothesis + URLs)</label>
+          <textarea id="content"
+          style="height:100px;"
+          placeholder="센터장님의 핵심 가설과 관련 URL을 기록하세요..."></textarea>
+        </div>
+        <div>
+          <label>무효화 조건 (Risk)</label>
+          <textarea id="invalidation" style="height:100px;" placeholder="가설이 틀렸음을 인정하는 조건..."></textarea>
+        </div>
+      </div>
+      <div class="trade-wrap">
+        <label style="display:inline-flex; align-items:center; gap:8px; margin:0; cursor:pointer;">
+          <input type="checkbox" id="isTrade" style="width:auto;" onchange="toggleTradeFields(this.checked)">
+          <span style="font-weight:900; color:var(--text);">매매 기록 활성화</span>
+        </label>
+        <div id="tradeFields" class="trade-grid hidden">
+          <div><label style="margin-top:10px;">진입가</label><input id="entry" type="number" placeholder="0"></div>
+          <div><label style="margin-top:10px;">목표가</label><input id="target" type="number" placeholder="0"></div>
+          <div><label style="margin-top:10px;">손절가</label><input id="stop" type="number" placeholder="0"></div>
+          <div><label style="margin-top:10px;">상태</label>
+            <select id="status">
+              <option value="ACTIVE">운용중</option>
+              <option value="CLOSED">종료</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+<div class="trade-wrap" style="border-color:var(--warning); background:#fffbeb;">
+  <label style="
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin:0;
+  cursor:pointer;
+">
+    <input
+  type="checkbox"
+  id="isAlarm"
+  style="width:16px; height:16px;"
+  onchange="toggleAlarmFields(this.checked)">
+    <b>⏰ 알람 활성화</b>
+  </label>
+
+  <div id="alarmFields" class="trade-grid hidden">
+    <div>
+      <label>알람 날짜</label>
+      <input type="date" id="alarmDate">
+    </div>
+    <div>
+      <label>며칠 후</label>
+      <input type="number" id="alarmAfter" placeholder="ex) 7">
+    </div>
+  </div>
+</div>
+
+
+      <div style="margin-top:12px;">
+        <label>시각 자료 및 캡처 (최대 3개 / Ctrl+V)</label>
+        <div id="captureBoard" class="capture-grid"></div>
+<label class="btn btn-ghost file-btn cap-file-btn">
+  📁 이미지 추가
+  <input type="file"
+         accept="image/*"
+         multiple
+         hidden
+         onchange="handleImageUpload(this.files)">
+</label>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; padding-top:15px; border-top:1px solid var(--line);">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn btn-primary" onclick="saveEntry()" style="padding:12px 40px; font-size:14px;">가설 승인 및 저장</button>
+          <button class="btn btn-ghost" onclick="openLinkModal(null)">🔗 분석 연결</button>
+          <button class="btn btn-ghost" onclick="clearForm()">초기화</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="panel">
+          <input id="treeSearch"
+       placeholder="종목 / 섹터 / 태그 / 내용 검색"
+       style="margin-bottom:10px;"
+       oninput="handleDeskSearch(this.value)">
+          <div id="treeList"></div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="timeline"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- TAB: 일정투자 모니터링 -->
+<div id="content-monitor" class="tab-content">
+  <iframe 
+    src="임영재_일정 투자용 기사 모니터링v260118_1700.html"
+    style="
+      width:100%;
+      height:100%;
+      border:none;
+      border-radius:12px;
+      background:#f4f7fa;
+    "
+    loading="lazy">
+  </iframe>
+</div>
+
+
+  <!-- TAB: EXPLORER -->
+
+  <div id="content-explorer" class="tab-content">
+    
+<!-- 알람 대기 가설 -->
+<div class="panel panel-highlight alarm" style="margin-bottom:15px;">
+  <label>⏰ 알람 대기 가설</label>
+  <div id="alarmQueue"></div>
+</div>
+
+<!-- 리뷰 대상 가설 -->
+<div class="panel panel-highlight review" style="margin-bottom:15px;">
+  <label>🔁 리뷰 대상 가설 (시간 경과)</label>
+  <div id="reviewQueue"></div>
+</div>
+
+
+<div class="panel" style="background:var(--accent-light); border-color:var(--accent);">
+      <label style="color:var(--accent);">Global Intelligence Explorer</label>
+      <input id="explorerGlobalSearch" placeholder="가설 내용, 종목, 태그 통합 검색..." style="padding:15px; font-size:15px; border:2px solid var(--accent);" oninput="renderExplorer()">
+    </div>
+    <div class="main-layout" style="grid-template-columns:1fr 1fr;">
+      <div class="panel"><h3 style="margin-top:0;">🕒 최근 분석 히스토리</h3><div id="explorerSearchResults"></div></div>
+      <div class="panel"><h3 style="margin-top:0;">🔗 지식 네트워크 (Link Map)</h3><div id="knowledgeLinkList"></div></div>
+    </div>
+  </div>
+
+
+  <!-- TAB: REPORT-->
+<div id="content-report" class="tab-content">
+
+    <div class="panel"
+     style="
+       display:flex;
+       gap:10px;
+       align-items:center;
+       margin-bottom:15px;
+       flex-wrap:wrap;
+     ">
+
+  <!-- 좌측: 기본 버튼 -->
+  <button class="btn btn-primary" onclick="newReport()">➕ 신규</button>
+  <button class="btn btn-success" onclick="saveReport()">💾 저장</button>
+<button class="btn btn-ghost"        onclick="resetReportEditor()">  ♻️ 입력 초기화</button>
+  <button class="btn btn-ghost" onclick="printReport()">🖨 출력</button>
+
+
+  <!-- 구분선 -->
+  <div style="width:1px; height:28px; background:var(--line); margin:0 6px;"></div>
+
+  
+
+  <span style="margin-left:auto; font-size:12px; color:var(--muted);">
+    🧾 Report Editor
+  </span>
+</div>
+
+
+  <!-- 메인 레이아웃 -->
+  <div class="report-layout">
+
+    <!-- 좌측: 레포트 목록 -->
+<div class="panel report-sidebar">
+  <label>📚 레포트 목록</label>
+
+  <input
+    id="reportSearch"
+    placeholder="레포트 검색..."
+    style="margin:8px 0 12px;"
+  />
+
+  <div id="reportList"></div>
+</div>
+
+
+  <div id="reportContainer">
+
+
+
+
+
+
+
+<!-- 🧾 블랭크 상태 -->
+<div id="reportBlankState"
+     style="
+       display:none;
+       padding:40px;
+       text-align:center;
+       color:var(--muted);
+     ">
+
+  <h3 style="margin-bottom:12px;">🧾 레포트가 선택되지 않았습니다</h3>
+
+  <p style="font-size:13px; line-height:1.8;">
+    좌측 목록에서 레포트를 선택하거나<br>
+    새 레포트를 생성해 주세요.
+  </p>
+
+  <button class="btn btn-primary"
+          style="margin-top:20px;"
+          onclick="newReport()">
+    ➕ 신규 레포트 만들기
+  </button>
+</div>
+
+
+<div id="reportEditorBody">
+    <!-- 우측: 레포트 본문 -->
+
+<!-- 메타 -->
+<div style="
+  display:grid;
+  grid-template-columns:160px 120px 120px 80px;
+  gap:10px;
+  margin-bottom:10px;
+  align-items:end;
+">
+
+  <div>
+    <label>대표 종목명</label>
+    <input id="reportTickerName" placeholder="ex) 삼성전자">
+  </div>
+
+  <div>
+    <label>종목코드</label>
+    <input id="reportTickerCode" placeholder="ex) 005930 / AAPL">
+  </div>
+
+
+
+
+  <div>
+    <label>현재 시세</label>
+    <input id="reportPrice"
+       placeholder="수동 입력 가능"
+       style="background:#fff;">
+  </div>
+
+  <div>
+    <label></label>
+    <button class="btn btn-ghost btn-mini"
+            style="width:100%;"
+            onclick="refreshReportPrice()">📊 시세 갱신</button>
+  </div>
+
+</div>
+
+<div style="
+  display:grid;
+  grid-template-columns:160px 1fr;
+  gap:10px;
+  margin-bottom:15px;
+  align-items:end;
+">
+
+  <div>
+    <label>레포트 날짜</label>
+    <input type="date" id="reportDate">
+  </div>
+
+  <div>
+    <label>레포트 제목</label>
+    <input id="reportTitle"
+           placeholder="ex) 2026.02 반도체 주간 코멘트">
+
+
+</div>
+
+  
+
+</div>
+<!-- 1. 근거 가설 -->
+<div style="
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-top:10px;
+">
+  <h4 style="margin:0;">
+    1. 근거 가설 (Key Hypotheses)
+  </h4>
+
+  <button class="btn btn-mini btn-ghost"
+          onclick="openReportEntryModal()">
+    ➕ 카드 추가
+  </button>
+</div>
+
+<!-- ✅ 근거 가설 카드 출력 영역 (필수) -->
+<div id="reportEntryList" class="report-entry-box"></div>
+
+  <!-- 센터 의견 -->
+  <label style="margin-top:10px;">센터 의견 (One-liner)</label>
+  <textarea id="reportOpinion"
+            placeholder="센터의 결론 요약"
+            style="min-height:60px;"></textarea>
+
+  <!-- 2. Executive Summary -->
+  <div class="report-section">
+  <h4>
+    2. Executive Summary
+    <button class="btn btn-mini btn-ghost"
+            onclick="openReportSectionEntryModal('summary')">
+      🔗 카드 추가
+    </button>
+  </h4>
+
+  <div id="summaryCardList" class="report-entry-box"></div>
+  <textarea id="sec-summary"></textarea>
+</div>
+
+  <!-- 3. Macro Environment -->
+  <div class="report-section">
+    <h4>3. Macro Environment
+    <button class="btn btn-mini btn-ghost"
+            onclick="openReportSectionEntryModal('macro')">
+      🔗 카드 추가
+    </button>
+</h4>
+  <div id="macroCardList" class="report-entry-box"></div>
+    <textarea id="sec-macro"></textarea>
+  </div>
+
+  <!-- 4. Sector View -->
+  <div class="report-section">
+  <h4>
+    4. Sector View
+    <button class="btn btn-mini btn-ghost"
+            onclick="openReportSectionEntryModal('sector')">
+      🔗 카드 추가
+    </button>
+  </h4>
+
+  <div id="sectorCardList" class="report-entry-box"></div>
+  <textarea id="sec-sector"></textarea>
+</div>
+
+  <!-- 5. Conclusion & Action -->
+ <div class="report-section">
+  <h4>
+    5. Conclusion & Action
+    <button class="btn btn-mini btn-ghost"
+            onclick="openReportSectionEntryModal('conclusion')">
+      🔗 카드 추가
+    </button>
+  </h4>
+
+  <div id="conclusionCardList" class="report-entry-box"></div>
+  <textarea id="sec-conclusion"></textarea>
+</div>
+
+
+
+
+
+
+<!-- MODALS -->
+<div id="linkModal" class="modal">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <h3 style="margin:0;">🔗 리포트 상호 연결</h3>
+      <button class="btn btn-ghost" onclick="toggleModal('linkModal')">닫기</button>
+    </div>
+    <input id="linkSearch" placeholder="연결할 가설 키워드나 종목 검색..." style="margin-bottom:15px;" oninput="renderLinkOptions(this.value)">
+    <div id="linkOptions" style="max-height:450px; overflow-y:auto; border:1px solid var(--line); border-radius:10px;"></div>
+  </div>
+</div>
+
+<!-- ❔ 가이드 모달 -->
+<div id="helpModal" class="modal" onclick="toggleModal('helpModal')">
+  <div class="modal-content" onclick="event.stopPropagation()">
+
+    <h3>📘 Research Desk v10.5 가이드</h3>
+
+<div style="font-size:13px; line-height:1.9; color:var(--muted);">
+
+<b style="color:var(--text); font-size:15px;">🧠 Research Desk 개요</b><br>
+Research Desk는 단순 메모장이 아니라,<br>
+<b>가설 → 근거 → 무효화 조건 → 검증</b> 구조를 갖춘 리서치 시스템입니다.<br>
+모든 기록은 시간순으로 축적되며 판단의 히스토리가 됩니다.<br><br>
+
+<b style="color:var(--text);">📌 핵심 원칙</b><br>
+1) 반드시 <b>가설 + 근거(URL)</b>를 함께 기록합니다.<br>
+2) 반드시 <b>무효화 조건(Risk)</b>을 명시합니다.<br>
+3) 기록은 검증을 위한 자산입니다.<br><br>
+
+<hr style="margin:18px 0; border:none; border-top:1px dashed var(--line);">
+
+<b style="color:var(--text); font-size:14px;">🧭 기본 사용 흐름</b><br><br>
+
+① 종목명 + 코드 입력<br>
+② <b>Ctrl + Shift + C</b> → 종목 코드 조회<br>
+③ 가설 + 근거 + 리스크 입력<br>
+④ (선택) 매매 기록 활성화<br>
+⑤ <b>Ctrl + Enter</b> → 저장<br><br>
+
+이미지는 <b>Ctrl + V</b>로 붙여넣기 가능 (최대 3장).<br>
+클릭 시 확대 + 펜 메모 저장 가능.<br><br>
+
+<hr style="margin:18px 0; border:none; border-top:1px dashed var(--line);">
+
+<b style="color:var(--text); font-size:14px;">⌨️ 단축키 안내</b><br><br>
+
+<b style="color:var(--text);">📌 전역</b><br>
+• <b>Ctrl + Enter</b> : 저장 (Desk / Report)<br>
+• <b>Ctrl + Shift + F</b> : 현재 탭 검색창 이동<br>
+• <b>Ctrl + Shift + C</b> : 종목 코드 조회<br>
+• <b>Ctrl + Shift + Q</b> : 현재 종목 시세 갱신<br>
+• <b>Ctrl + Alt + Q</b> : 전체 시세 동기화<br>
+• <b>Ctrl + Alt + D</b> : Desk 탭 이동<br>
+• <b>Ctrl + Alt + M</b> : Monitor 탭 이동<br>
+• <b>Ctrl + Alt + E
+
+    <button class="btn btn-primary"
+            style="margin-top:20px; width:100%;"
+            onclick="toggleModal('helpModal')">
+      가이드 닫기
+    </button>
+
+  </div>
+</div>
+
+<div id="lightbox" class="modal" onclick="this.style.display='none'">
+  <div style="
+    background:rgba(255,255,255,0.6);
+    backdrop-filter: blur(6px);
+    padding:20px;
+    border-radius:12px;
+    max-width:90%;
+    max-height:90%;
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+  " onclick="event.stopPropagation()">
+
+<!-- 🖼 이미지 + 펜 캔버스 래퍼 -->
+<div id="imgCanvasWrap"
+     style="
+       position:relative;
+       display:inline-block;
+       max-width:60vw;
+       max-height:80vh;
+     ">
+
+  <img id="lbImg"
+       style="
+         display:block;
+         max-width:100%;
+         max-height:80vh;
+         border-radius:8px;
+       ">
+
+  <!-- ✏️ 펜 / 마우스 캔버스 -->
+  <canvas id="penCanvas"
+          style="
+            position:absolute;
+            left:0;
+            top:0;
+            touch-action:none;
+            border-radius:8px;
+          ">
+  </canvas>
+
+</div>
+
+<div id="lbNoteWrap"
+     style="
+       max-width:320px;
+       display:none;
+       flex-direction:column;
+       gap:8px;
+     ">
+
+  <textarea id="lbNoteInput"
+    style="
+      width:100%;
+      min-height:120px;
+      padding:10px;
+      font-size:12px;
+      line-height:1.6;
+      background:#fffbea;
+      border:1px solid #fde68a;
+      border-radius:6px;
+      color:#713f12;
+      resize:vertical;
+    "
+    placeholder="캡처 메모 수정..."
+  ></textarea>
+
+  <button class="btn btn-success btn-mini"
+          onclick="saveLightboxNote()">
+    ✔ 메모 저장
+  </button>
+
+<button class="btn btn-primary btn-mini"
+        onclick="savePenToImage()">
+  ✏️ 펜 메모 저장
+</button>
+
+</div>
+
+  </div>
+</div>
+
+<script>
+// ================================================
+// 데이터베이스 초기화
+// ================================================
+let db = JSON.parse(localStorage.getItem('rd_v10_5') || '{"entries":[],"reports":[],"meta":{"lastImportAt":0,"lastExportAt":0,"lastQuoteSyncAt":0}}');
+if (!db.meta) db.meta = { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 };
+
+let draftImages = [];
+let draftLinks = [];
+let editingId = null;
+let selectedTicker = "ALL";
+let linkingTargetId = null;
+let editingComment = { entryId: null, index: null };
+let lightboxImageIndex = null;
+let lightboxMode = "draft"; // "draft" | "entry"
+let lightboxEntryId = null;
+let editingReportId = null;
+let reportDraft = null;
+let reportTargetSection = null;
+let deskSearchQuery = "";
+
+// 초기 설정
+document.getElementById('date').value = new Date().toISOString().split('T')[0];
+renderCaptureBoard();
+renderAll();
+updateSyncStatus();
+renderReportList(); // ✅ 추가
+updateReportEditorState(); // ✅ 추가: reportDraft=null이면 블랭크 표시
+checkAlarms();   // 🔔 여기
+
+document.getElementById('reportSearch')
+  ?.addEventListener('input', filterReport);
+
+// ================================================
+// 헬퍼 함수들
+// ================================================
+function getSummary(text) {
+  if (!text) return "";
+  const firstLine = text.split('\n')[0];
+  return firstLine.length > 40 ? firstLine.substring(0, 40) + "..." : firstLine;
+}
+
+function getTickerSeq(e) {
+  const base = db.entries
+    .filter(x => selectedTicker === "ALL" ? x.tickerCode === e.tickerCode : x.tickerCode === selectedTicker)
+    .sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+  return base.indexOf(e) + 1;
+}
+
+function toggleTradeFields(on) {
+  document.getElementById('tradeFields').classList.toggle('hidden', !on);
+}
+
+function fmtNum(v) {
+  if (v == null || v === "") return "-";
+  const n = Number(v);
+  return isNaN(n) ? String(v) : n.toLocaleString();
+}
+
+function calcROI(entry, current) {
+  if (!entry || !current || entry == 0) return "";
+  const roi = ((current - entry) / entry * 100).toFixed(2);
+  const color = roi > 0 ? 'var(--success)' : 'var(--danger)';
+  return `<span style="color:${color}; font-weight:800;">ROI: ${roi}%</span>`;
+}
+
+function toggleInputPanel() {
+  const p = document.getElementById('inputPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+// ================================================
+// URL 미리보기 관련
+// ================================================
+function extractUrls(text) {
+  return (text.match(/https?:\/\/[^\s)<>"']+/g) || []);
+}
+
+function generateUrlPreviewHtml(text) {
+  const urls = [...new Set(extractUrls(text))];
+  if (!urls.length) return "";
+  let html = '<div class="url-preview-area">';
+  urls.forEach((url, i) => {
+    const id = `urlpv-${Date.now()}-${i}`;
+    let domain = "link";
+    try { domain = new URL(url).hostname; } catch {}
+    html += `
+      <a href="${url}" target="_blank" class="url-card" id="${id}" data-url="${encodeURIComponent(url)}">
+        <div class="url-thumb" data-thumb><span style="font-size:24px; opacity:0.3;">🔗</span></div>
+        <div class="url-info">
+          <div class="url-domain">${domain}</div>
+          <div class="url-title" data-title>${domain} 불러오는 중...</div>
+          <div class="url-snippet" data-desc>${url}</div>
+        </div>
+      </a>`;
+  });
+  html += '</div>';
+  let hydrateTimer;
+clearTimeout(hydrateTimer);
+hydrateTimer = setTimeout(hydrateUrlCards, 100);
+  return html;
+}
+
+const URLMETA_CACHE_KEY = "rd_urlmeta_cache_v2";
+
+function loadMetaCache() {
+  try { return JSON.parse(localStorage.getItem(URLMETA_CACHE_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function saveMetaCache(cache) {
+  try { localStorage.setItem(URLMETA_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+function isYoutubeUrl(url) {
+  return url.includes("youtube.com/watch") || url.includes("youtu.be/");
+}
+
+function getYoutubeId(url) {
+  try {
+    if (url.includes("v=")) return url.split("v=")[1].split("&")[0];
+    return new URL(url).pathname.replace(/^\//, "").split("/")[0];
+  } catch { return ""; }
+}
+
+async function fetchUrlMeta(url) {
+  if (isYoutubeUrl(url)) {
+    const vid = getYoutubeId(url);
+    const thumb = vid ? `https://img.youtube.com/vi/${vid}/mqdefault.jpg` : "";
+    const oembed = `https://noembed.com/embed?url=${encodeURIComponent(url)}`;
+    try {
+      const res = await fetch(oembed);
+      const data = await res.json();
+      return {
+        title: data.title || "YouTube 영상",
+        desc: data.author_name ? `채널: ${data.author_name}` : url,
+        image: data.thumbnail_url || thumb
+      };
+    } catch {
+      try {
+        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(oembed)}`);
+        const data = await res.json();
+        return {
+          title: data.title || "YouTube 영상",
+          desc: data.author_name ? `채널: ${data.author_name}` : url,
+          image: data.thumbnail_url || thumb
+        };
+      } catch {
+        return { title: "YouTube 영상", desc: url, image: thumb };
+      }
+    }
+  }
+
+  let title = "", desc = "", image = "";
+  try {
+    const jina = `https://r.jina.ai/${encodeURIComponent(url)}`;
+    let txt = await (await fetch(jina)).text();
+    title = txt.match(/<title>([^<]+)<\/title>/i)?.[1] ||
+            txt.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1] || "";
+    desc  = txt.match(/name=["']description["'][^>]*content=["']([^"']+)["']/i)?.[1] || "";
+    image = txt.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1] || "";
+  } catch {
+    try {
+      const proxy = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+      const txt = await (await fetch(proxy)).text();
+      title = txt.match(/<title>([^<]+)<\/title>/i)?.[1] || new URL(url).hostname;
+      desc  = txt.match(/name=["']description["'][^>]*content=["']([^"']+)["']/i)?.[1] || "";
+      image = txt.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1] || "";
+    } catch {}
+  }
+
+  title = title || `${new URL(url).hostname} 기사`;
+  return { title, desc: desc || "요약 없음", image: image.trim() || "" };
+}
+
+function applyMetaToCard(card, meta) {
+  const t  = card.querySelector("[data-title]");
+  const d  = card.querySelector("[data-desc]");
+  const th = card.querySelector("[data-thumb]");
+
+  if (t) {
+    t.textContent = meta.title;
+    t.dataset.done = "1";
+  }
+
+  if (d) {
+    d.textContent = meta.desc;
+  }
+
+  if (th) {
+    th.innerHTML = meta.image
+      ? `<img src="${meta.image}" alt=""
+           onerror="this.style.display='none';
+                    this.parentElement.innerHTML='📄';">`
+      : `<span style="font-size:24px; opacity:0.3;">🔗</span>`;
+  }
+}
+
+async function hydrateUrlCards() {
+  const cards = [...document.querySelectorAll(".url-card[data-url]")];
+  const cache = loadMetaCache();
+
+  const tasks = cards.map(async card => {
+    const url = decodeURIComponent(card.dataset.url || "");
+    if (!url) return;
+
+    const titleEl = card.querySelector("[data-title]");
+    if (titleEl?.dataset.done === "1") return;
+
+    let meta;
+
+    if (cache[url]) {
+      meta = cache[url];
+    } else {
+      try {
+        meta = await fetchUrlMeta(url);
+        cache[url] = meta;
+      } catch {
+        meta = {
+          title: new URL(url).hostname + " 바로가기",
+          desc: "",
+          image: ""
+        };
+      }
+    }
+
+    // ✅ 여기서만 보정
+    if (!meta.desc || meta.desc === "요약 없음") {
+      meta.desc = getPlatformLabel(url) + " · 요약 미제공";
+    }
+
+    applyMetaToCard(card, meta);
+  });
+
+  await Promise.all(tasks);
+  saveMetaCache(cache);
+}
+
+
+// ================================================
+// 카드 / 타임라인 렌더링
+// ================================================
+function createCardHtml(e) {
+
+const ageDays = getAgeDays(e);
+const ageBucket = getAgeBucket(ageDays);
+
+const ageBadge = ageBucket
+  ? `<span
+       style="
+         margin-left:6px;
+         font-size:10px;
+         padding:2px 6px;
+         border-radius:6px;
+         background:${ageBucket.bg};
+         color:${ageBucket.color};
+         font-weight:900;
+       "
+       title="경과 ${ageDays}일"
+     >
+       ⏳ ${ageBucket.label}
+     </span>`
+  : '';
+
+
+
+let alarmBadge = "";
+
+if (e.isAlarm && e.alarm && e.alarm.date) {
+  const today = new Date().toISOString().split('T')[0];
+  const diff =
+    Math.ceil(
+      (new Date(e.alarm.date) - new Date(today)) / 86400000
+    );
+
+  if (e.alarm.done) {
+    alarmBadge = `<span class="alarm-badge done">⏰ DONE</span>`;
+  } else if (diff < 0) {
+    alarmBadge = `<span class="alarm-badge overdue">⏰ D+${Math.abs(diff)}</span>`;
+  } else if (diff === 0) {
+    alarmBadge = `<span class="alarm-badge today">⏰ TODAY</span>`;
+  } else {
+    alarmBadge = `<span class="alarm-badge upcoming">⏰ D-${diff}</span>`;
+  }
+}
+
+
+  const outgoingLinks = e.links || [];
+  const incomingLinks = db.entries.filter(x => (x.links || []).includes(e.id));
+  const incoming = getIncomingLinks(e.id);
+  const incomingBadge = incoming.length
+    ? `<span class="link-summary"
+              style="background:#ecfeff;color:#0369a1;"
+              onclick="jumpToNote(${incoming[0].id})">
+         ↔ 연결됨 ${incoming.length}
+       </span>`
+    : '';
+
+  const usedInReports = getReportsUsingEntry(e.id);
+  const reportBadges = usedInReports.map(r => `
+    <span class="link-summary"
+          style="background:#fef3c7; color:#92400e;"
+          onclick="openReport(${r.id})">
+      🧾 ${r.title || "(제목 없음)"}
+    </span>
+  `).join("");
+
+  const urlPreview = generateUrlPreviewHtml(e.content);
+  const seq = getTickerSeq(e);
+  const price = e.currentPrice
+  ? `<span style="color:var(--success); margin-left:8px;">
+       현재가 ${fmtNum(e.currentPrice)}
+       ${
+         e.quoteTime
+           ? `<small style="color:var(--muted); margin-left:4px;">
+                (${new Date(e.quoteTime).toLocaleString()})
+              </small>`
+           : ''
+       }
+     </span>`
+  : '';
+
+  const roi = e.isTrade && e.trade?.entry && e.currentPrice
+    ? calcROI(e.trade.entry, e.currentPrice)
+    : '';
+
+  return `
+  <div class="card" id="card-${e.id}">
+    <div class="card-header">
+      <div>
+        <span class="card-title" onclick="selectTree('${e.tickerCode}')">
+  ${e.tickerName}(${e.tickerCode}) <small>#${seq}</small>
+</span>
+${ageBadge}
+${alarmBadge}
+${e.sector ? `
+  <span class="meta-pill sector"
+      onclick="searchDeskByMeta('${e.sector}')"
+      style="cursor:pointer;">
+  🏷 ${e.sector}
+</span>
+` : ''}
+
+${e.tags ? e.tags.split(',').map(t => `
+<span class="meta-pill tag"
+      onclick="searchDeskByMeta('${t.trim()}')"
+      style="cursor:pointer;">
+  #${t.trim()}
+</span>`).join('') : ''}
+
+<span style="color:var(--muted); margin-left:10px;">${e.date}</span>
+
+        ${price}
+        ${e.isTrade && e.trade ? `
+          <div class="trade-pill" style="margin-top:8px;">
+            P ${fmtNum(e.trade.entry)} · T ${fmtNum(e.trade.target)} · S ${fmtNum(e.trade.stop)} · ${e.trade.status}
+            ${roi ? ` · ${roi}` : ''}
+          </div>` : ''}
+  ${incomingBadge}
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-ghost btn-mini" onclick="syncSingleQuote(${e.id})">📊 시세 갱신</button>
+        <button class="btn btn-ghost btn-mini" onclick="openLinkModal(${e.id})">🔗 연결</button>
+        <button class="btn btn-ghost btn-mini" onclick="editEntry(${e.id})">✏️</button>
+        <button class="btn btn-ghost btn-mini" style="color:var(--danger)" onclick="deleteEntry(${e.id})">🗑</button>
+      </div>
+    </div>
+    <div style="white-space:pre-wrap; font-weight:600; line-height:1.6; margin:0 0 12px;">${applyHighlight(e.content)}</div>
+    ${urlPreview}
+    ${e.invalidation ? `<div style="font-size:12px; color:var(--danger); background:#fff1f2; padding:8px; border-radius:6px;"><b>Risk:</b> ${e.invalidation}</div>` : ''}
+
+
+${(e.images||[]).map((img, idx) => `
+  <div style="
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    margin:12px 0;
+    padding-bottom:12px;
+    border-bottom:${idx < e.images.length - 1 ? '1px dashed var(--line)' : 'none'};
+  ">
+
+    <!-- 📸 캡처 이미지 -->
+    <img src="${img.src}"
+     style="
+       width:120px;
+       height:80px;
+       object-fit:cover;
+       border-radius:8px;
+       cursor:pointer;
+       flex-shrink:0;
+       box-shadow:0 2px 6px rgba(0,0,0,.1);
+     "
+     onclick="openImg(
+       '${img.src.replace(/'/g,"\\'")}',
+       '${(img.note||"").replace(/'/g,"\\'")}',
+       ${idx},
+       ${e.id}
+     )">
+
+    <!-- 📝 캡처 메모 (우측, 댓글 톤) -->
+${img.note ? `
+  <div style="
+    flex:1;
+    padding:10px 12px;
+    background:#fffbea;
+    border:1px solid #fde68a;
+    border-radius:6px;
+    font-size:12px;
+    line-height:1.6;
+    color:#713f12;
+    white-space:pre-wrap;
+    box-shadow:2px 2px 0 rgba(0,0,0,.05);
+  ">
+    ${escapeHtml(img.note)}
+  </div>
+` : ''}
+
+  </div>
+`).join('')}
+
+    <div style="margin-top:12px; border-top:1px solid #f1f5f9; padding-top:10px; display:flex; flex-wrap:wrap; gap:6px;">
+
+  
+  ${outgoingLinks.length ? `
+    <div style="font-size:11px; font-weight:900; color:var(--accent);">
+      🔗 내가 연결한 가설
+    </div>
+    ${outgoingLinks.map(lid => {
+  const t = db.entries.find(x => x.id === lid);
+  if (!t) return '';
+  const tSeq = getTickerSeq(t);
+  return `
+    <div class="link-summary"
+         style="display:flex; align-items:center; gap:6px;">
+      <span onclick="jumpToNote(${lid})" style="flex:1; cursor:pointer;">
+        ↳ [${t.tickerName}(${t.tickerCode}) #${tSeq}]
+        ${getSummary(t.content)} (${t.date})
+      </span>
+<span
+  onclick="removeEntryLink(${e.id}, ${lid})"
+  style="
+    font-size:9px;
+    line-height:1;
+    color:var(--muted);
+    cursor:pointer;
+    padding:2px 4px;
+    margin-left:6px;
+  "
+  title="연결 취소"
+>
+  ×
+</span>
+    </div>`;
+}).join('')}
+  ` : ''}
+
+  ${incomingLinks.length ? `
+    <div style="font-size:11px; font-weight:900; color:#0369a1; margin-top:6px;">
+      🔁 나를 참조한 가설
+    </div>
+    ${incomingLinks.map(src => {
+      const sSeq = getTickerSeq(src);
+      return `
+        <div class="link-summary"
+             style="background:#ecfeff;color:#0369a1;"
+             onclick="jumpToNote(${src.id})">
+          ↲ [${src.tickerName}(${src.tickerCode}) #${sSeq}]
+          ${getSummary(src.content)} (${src.date})
+        </div>`;
+    }).join('')}
+  ` : ''}
+
+</div>
+
+    <div class="comment-box">
+      <div style="font-weight:900; font-size:12px; color:var(--muted); margin:6px 0;">💬 댓글</div>
+
+${(e.comments||[]).map((c, idx) => {
+  const isEditing =
+    editingComment.entryId === e.id &&
+    editingComment.index === idx;
+
+  return `
+  <div class="comment-item"
+       style="display:flex; gap:8px; align-items:center;">
+
+    ${isEditing ? `
+      <textarea
+        style="flex:1;"
+        onkeydown="handleCommentKey(event, ${e.id}, ${idx})"
+      >${escapeHtml(c.text)}</textarea>
+
+      <button class="btn btn-mini btn-success"
+        onclick="saveEditedComment(${e.id}, ${idx}, this)">
+        ✔
+      </button>
+
+      <button class="btn btn-mini btn-ghost"
+        onclick="cancelEditComment()">
+        취소
+      </button>
+    ` : `
+      <span style="flex:1;">
+        • ${escapeHtml(c.text)}
+        <small style="color:var(--muted);">
+          ${new Date(c.ts).toLocaleDateString()}
+        </small>
+      </span>
+
+      <button class="btn btn-mini btn-ghost"
+        onclick="startEditComment(${e.id}, ${idx})">✎</button>
+
+      <button class="btn btn-mini btn-ghost"
+        style="color:var(--danger);"
+        onclick="deleteCommentInline(${e.id}, ${idx})">×</button>
+    `}
+  </div>
+  `;
+}).join('')}
+
+      <div class="comment-input">
+        <input placeholder="댓글 입력 후 Enter" onkeydown="if(event.key==='Enter') addComment(${e.id}, this)">
+        <button class="btn btn-primary btn-mini" onclick="addComment(${e.id}, this.previousElementSibling)">추가</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTimeline() {
+  const filtered = db.entries.filter(e => {
+
+    // 1️⃣ 종목 트리 필터
+    if (selectedTicker !== 'ALL' && e.tickerCode !== selectedTicker) {
+      return false;
+    }
+
+    // 2️⃣ Desk 검색 필터 (realtime)
+    if (deskSearchQuery) {
+
+  const q = deskSearchQuery.replace(/^#/, ""); // 🔑 핵심
+
+      const haystack = [
+        e.tickerName,
+        e.tickerCode,
+        e.sector || "",
+        e.tags || "",
+        e.content || "",
+        e.invalidation || ""
+      ].join(" ").toLowerCase();
+
+     if (!haystack.includes(q)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  document.getElementById('timeline').innerHTML =
+    filtered.map(createCardHtml).join('');
+}
+
+function renderTree(q = "") {
+  const counts = db.entries.reduce((acc, e) => {
+    const code = e.tickerCode;
+    if (!acc[code]) acc[code] = { name: e.tickerName, count: 0 };
+    acc[code].count++;
+    return acc;
+  }, {});
+
+  const list = document.getElementById('treeList');
+  const query = (q || "").toUpperCase();
+  let html = `<div class="tree-item ${selectedTicker==='ALL'?'active':''}" onclick="selectTree('ALL')"><span>전체보기</span><span>${db.entries.length}</span></div>`;
+
+  Object.keys(counts).sort().forEach(code => {
+    const { name, count } = counts[code];
+    if (!q || code.includes(query) || name.toUpperCase().includes(query)) {
+      html += `<div class="tree-item ${selectedTicker===code?'active':''}" onclick="selectTree('${code}')"><span>${name}</span><small>${count}</small></div>`;
+    }
+  });
+  list.innerHTML = html;
+}
+
+function renderAll() {
+  renderTree(document.getElementById('treeSearch').value || "");
+  renderTimeline();
+}
+
+// ================================================
+// 기타 기능들 (jump, link, explorer, comment 등)
+// ================================================
+
+
+function startEditComment(entryId, idx) {
+  editingComment = { entryId, index: idx };
+  renderAll();
+}
+
+function cancelEditComment() {
+  editingComment = { entryId: null, index: null };
+  renderAll();
+}
+
+function saveEditedComment(entryId, idx, btnEl) {
+  const textarea = btnEl.previousElementSibling;
+  const text = textarea.value.trim();
+  if (!text) return;
+
+  const entry = db.entries.find(e => e.id === entryId);
+  entry.comments[idx].text = text;
+  entry.comments[idx].ts = Date.now();
+entry.updatedAt = Date.now();
+
+  editingComment = { entryId: null, index: null };
+  persist(); renderAll();
+}
+
+function handleCommentKey(e, entryId, idx) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    saveEditedComment(entryId, idx, e.target.nextElementSibling);
+  }
+  if (e.key === 'Escape') {
+    cancelEditComment();
+  }
+}
+
+function deleteCommentInline(entryId, idx) {
+  if (!confirm("댓글을 삭제할까요?")) return;
+  const entry = db.entries.find(e => e.id === entryId);
+  entry.comments.splice(idx, 1);
+entry.updatedAt = Date.now();
+  persist(); renderAll(); updateSyncStatus();
+}
+
+function jumpToNote(id) {
+  switchTab('desk');
+  selectedTicker = "ALL";
+  renderAll();
+  setTimeout(() => {
+    const el = document.getElementById(`card-${id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.boxShadow = "0 0 20px var(--warning)";
+      setTimeout(() => el.style.boxShadow = "", 2000);
+    }
+  }, 300);
+}
+
+function openLinkModal(id) {
+  linkingTargetId = id;
+  document.getElementById('linkSearch').value = "";
+  renderLinkOptions("");
+  toggleModal('linkModal');
+}
+
+function renderLinkOptions(q) {
+  const query = (q || "").trim().toLowerCase();
+  const options = db.entries.filter(e =>
+    e.id !== (linkingTargetId || editingId) &&
+    (e.tickerName.toLowerCase().includes(query) ||
+     e.tickerCode.toLowerCase().includes(query) ||
+     (e.content||"").toLowerCase().includes(query))
+  ).slice(0,15);
+
+  document.getElementById('linkOptions').innerHTML = options.map(e => {
+    const seq = getTickerSeq(e);
+    return `
+    <div style="padding:12px; border-bottom:1px solid #eee; cursor:pointer;" onclick="confirmLink(${e.id})">
+      <div style="font-weight:900; color:var(--accent);">${e.tickerName}(${e.tickerCode}) #${seq} (${e.date})</div>
+      <div style="font-size:12px; color:var(--muted);">${getSummary(e.content)}</div>
+    </div>`;
+  }).join('') || `<div style="padding:12px; color:var(--muted);">검색 결과 없음</div>`;
+}
+
+function confirmLink(targetId) {
+  // 🔹 Report 섹션 카드 추가
+  if (linkingTargetId === "__REPORT_SECTION__") {
+    confirmReportSectionLink(targetId);
+    return;
+  }
+
+  // 🔹 Report 근거 가설(entries)
+  if (linkingTargetId === "__REPORT__" && reportDraft) {
+    if (!reportDraft.entries.includes(targetId)) {
+      reportDraft.entries.push(targetId);
+      renderReportEntries();
+    }
+    toggleModal('linkModal');
+    return;
+  }
+
+  // 🔹 기존 가설 ↔ 가설 링크
+  if (linkingTargetId) {
+    const entry = db.entries.find(x => x.id === linkingTargetId);
+    if (!entry.links) entry.links = [];
+    if (!entry.links.includes(targetId)) {
+      entry.links.push(targetId);
+      persist();
+      renderAll();
+    }
+  }
+  toggleModal('linkModal');
+}
+
+
+function renderExplorer() {
+  const q = (document.getElementById('explorerGlobalSearch').value || "").toLowerCase();
+  const hits = db.entries
+    .filter(e => !q || [e.tickerName, e.tickerCode, e.sector||"", e.tags||"", e.content||""].some(v => v.toLowerCase().includes(q)))
+    .slice(0,40);
+
+  // 상단 검색 결과 렌더링
+  document.getElementById('explorerSearchResults').innerHTML = hits.map(e => {
+const incoming = getIncomingLinks(e.id);
+    const seq = getTickerSeq(e);
+    return `
+    <div class="explorer-item" onclick="jumpToNote(${e.id})">
+      <div style="display:flex; justify-content:space-between;">
+        <span style="font-weight:900; color:var(--accent);">${e.tickerName}(${e.tickerCode}) #${seq}</span>
+        <span style="font-size:11px; color:var(--muted);">${e.date}</span>
+      </div>
+      <div style="margin-top:4px;">
+        ${e.sector ? `
+  <span class="meta-pill sector"
+        onclick="event.stopPropagation(); searchByMeta('sector','${e.sector}')"
+        style="cursor:pointer;">
+    🏷 ${e.sector}
+  </span>
+` : ''}
+
+${e.tags ? e.tags.split(',').map(t => `
+  <span class="meta-pill tag"
+        onclick="event.stopPropagation(); searchByMeta('tag','${t.trim()}')"
+        style="cursor:pointer;">
+    #${t.trim()}
+  </span>
+`).join('') : ''}
+      </div>
+      <div style="font-size:13px; margin-top:4px;">${applyHighlight(getSummary(e.content))}</div>
+
+
+<!-- 📸 캡쳐 미리보기 -->
+${e.images && e.images.length ? `
+<div
+  style="margin-top:8px; display:inline-block;"
+  onclick="event.stopPropagation(); openImg(
+    '${e.images[0].src.replace(/'/g,"\\'")}',
+    '${(e.images[0].note||"").replace(/'/g,"\\'")}',
+    0,
+    ${e.id}
+  )">
+  <img src="${e.images[0].src}"
+       style="
+         width:120px;
+         height:80px;
+         object-fit:cover;
+         border-radius:8px;
+         cursor:pointer;
+         box-shadow:0 2px 6px rgba(0,0,0,.12);
+       ">
+</div>
+` : ''}
+
+<!-- 🔗 / 💬 상태 -->
+<div style="
+  margin-top:6px;
+  font-size:11px;
+  color:var(--muted);
+  display:flex;
+  gap:10px;
+  align-items:center;
+">
+<!-- 🔗 연결된 가설 (Alarm Queue와 동일) -->
+${(e.links || []).length ? `
+<div style="
+  margin-top:8px;
+  font-size:11px;
+  padding-top:6px;
+  border-top:1px dashed var(--line);
+">
+  <b style="color:var(--accent);">🔗 연결된 가설</b>
+  ${(e.links || []).slice(0,2).map(lid => {
+    const t = db.entries.find(x => x.id === lid);
+    if (!t) return '';
+    return `
+      <div class="link-summary"
+           style="margin-top:4px;"
+           onclick="event.stopPropagation(); jumpToNote(${t.id})">
+        ↳ ${t.tickerName}(${t.tickerCode}) · ${getSummary(t.content)}
+      </div>
+    `;
+  }).join('')}
+</div>
+` : ''}
+
+${incoming.length ? `
+<div style="
+  margin-top:8px;
+  font-size:11px;
+  padding-top:6px;
+  border-top:1px dashed var(--line);
+">
+  <b style="color:#0369a1;">🔁 나를 참조한 가설</b>
+  ${incoming.slice(0,2).map(src => `
+    <div class="link-summary"
+         style="margin-top:4px; background:#ecfeff; color:#0369a1;"
+         onclick="event.stopPropagation(); jumpToNote(${src.id})">
+      ↲ ${src.tickerName}(${src.tickerCode}) · ${getSummary(src.content)}
+    </div>
+  `).join('')}
+</div>
+` : ''}
+
+</div>
+
+<!-- 💬 댓글 (Explorer 하단 고정) -->
+${(e.comments || []).length ? `
+<div style="
+  margin-top:10px;
+  padding-top:8px;
+  border-top:1px dashed var(--line);
+  font-size:11px;
+  color:var(--muted);
+">
+  <b>💬 댓글</b>
+
+  ${(e.comments || []).slice(-2).map(c => `
+    <div style="
+      margin-top:6px;
+      line-height:1.5;
+      white-space:normal;
+    ">
+      • ${escapeHtml(c.text)}
+    </div>
+  `).join('')}
+
+
+</div>
+` : ''}
+
+      
+    </div>`;
+  }).join('') || `<div style="padding:12px; color:var(--muted);">결과 없음</div>`;
+
+  // 지식 네트워크(연결 쌍) 추출 및 렌더링
+  const pairs = [];
+  db.entries.forEach(src => (src.links||[]).forEach(tid => {
+    const tgt = db.entries.find(x => x.id === tid);
+    if (tgt) pairs.push({src, tgt});
+  }));
+
+  document.getElementById('knowledgeLinkList').innerHTML = pairs.slice(0,40).map(p => {
+    const sSeq = getTickerSeq(p.src);
+    const tSeq = getTickerSeq(p.tgt);
+    return `
+    <div class="explorer-item" style="border-left:4px solid var(--success);">
+      <div onclick="jumpToNote(${p.src.id})" style="font-weight:800; color:var(--accent); font-size:12px;">
+        [원본] ${p.src.tickerName}(${p.src.tickerCode}) #${sSeq}: ${escapeHtml(getSummary(p.src.content))}
+      </div>
+      <div style="margin:6px 0; color:var(--muted); font-size:10px; padding-left:10px;">▼ 연결됨</div>
+      <div onclick="jumpToNote(${p.tgt.id})" style="font-weight:800; color:var(--success); font-size:12px;">
+        [연결] ${p.tgt.tickerName}(${p.tgt.tickerCode}) #${tSeq}: ${escapeHtml(getSummary(p.tgt.content))}
+      </div>
+    </div>`;
+  }).join('') || `<div style="padding:12px; color:var(--muted);">연결된 리포트 없음</div>`;
+}
+
+
+function addComment(id, inputEl) {
+  const text = (inputEl.value || "").trim();
+  if (!text) return;
+  const entry = db.entries.find(x => x.id === id);
+  if (!entry) return;
+  if (!entry.comments) entry.comments = [];
+  entry.comments.push({ text, ts: Date.now() });
+entry.updatedAt = Date.now(); //
+  inputEl.value = "";
+  persist();
+  renderAll();
+  updateSyncStatus();
+}
+
+function escapeHtml(str) {
+  return String(str||"")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// ================================================
+// CRUD & Persist
+// ================================================
+function saveEntry() {
+  const code = document.getElementById('tickerCode').value.trim().toUpperCase();
+  const content = document.getElementById('content').value.trim();
+  if (!code || !content) return alert("티커와 가설 내용을 입력하세요.");
+
+  const isTrade = document.getElementById('isTrade').checked;
+
+  // 🔔 알람 값은 entry 객체 만들기 '전에' 계산
+  const isAlarm = !!document.getElementById('isAlarm')?.checked;
+
+  const alarmDate =
+    document.getElementById('alarmDate')?.value ||
+    (
+      document.getElementById('alarmAfter')?.value
+        ? new Date(Date.now() + Number(document.getElementById('alarmAfter').value) * 86400000)
+            .toISOString().split('T')[0]
+        : null
+    );
+
+  const alarm = (isAlarm && alarmDate)
+    ? { date: alarmDate, done: false }
+    : null;
+
+  const prev = editingId ? db.entries.find(x => x.id === editingId) : null;
+
+  const entry = {
+    id: editingId || Date.now(),
+    tickerName: document.getElementById('tickerName').value.trim() || code,
+    tickerCode: code,
+    sector: document.getElementById('sector').value.trim(),
+    date: document.getElementById('date').value,
+    tags: document.getElementById('tags').value.trim(),
+    content,
+    invalidation: document.getElementById('invalidation').value.trim(),
+    links: [...draftLinks],
+    images: [...draftImages],
+
+    comments: editingId ? (prev?.comments || []) : [],
+    updatedAt: Date.now(),
+    createdAt: editingId ? (prev?.createdAt || Date.now()) : Date.now(),
+
+    isTrade,
+    trade: isTrade ? {
+      entry: document.getElementById('entry').value,
+      target: document.getElementById('target').value,
+      stop: document.getElementById('stop').value,
+      status: document.getElementById('status').value
+    } : null,
+
+    // ✅ 알람 저장 (핵심)
+    isAlarm,
+    alarm,
+
+    // 기존 시세 유지
+    currentPrice: editingId ? (prev?.currentPrice ?? null) : null
+  };
+
+  if (editingId) {
+    db.entries = db.entries.map(x => x.id === editingId ? entry : x);
+  } else {
+    db.entries.unshift(entry);
+  }
+
+  persist();
+  clearForm();
+  renderAll();
+  updateSyncStatus();
+}
+function editEntry(id) {
+  const e = db.entries.find(x => x.id === id);
+  if (!e) return;
+
+  editingId = id;
+  document.getElementById('tickerName').value = e.tickerName || "";
+  document.getElementById('tickerCode').value = e.tickerCode || "";
+  document.getElementById('sector').value = e.sector || "";
+  document.getElementById('date').value = e.date || "";
+  document.getElementById('tags').value = e.tags || "";
+  document.getElementById('content').value = e.content || "";
+  document.getElementById('invalidation').value = e.invalidation || "";
+
+  draftLinks = [...(e.links || [])];
+  draftImages = [...(e.images || [])];
+
+  document.getElementById('isTrade').checked = !!e.isTrade;
+  toggleTradeFields(!!e.isTrade);
+
+  if (e.isTrade && e.trade) {
+    document.getElementById('entry').value = e.trade.entry || "";
+    document.getElementById('target').value = e.trade.target || "";
+    document.getElementById('stop').value = e.trade.stop || "";
+    document.getElementById('status').value = e.trade.status || "ACTIVE";
+  } else {
+    document.getElementById('entry').value = "";
+    document.getElementById('target').value = "";
+    document.getElementById('stop').value = "";
+    document.getElementById('status').value = "ACTIVE";
+  }
+
+// 🔔 알람 복원
+document.getElementById('isAlarm').checked = !!e.isAlarm;
+toggleAlarmFields(!!e.isAlarm);
+
+if (e.isAlarm && e.alarm) {
+  document.getElementById('alarmDate').value = e.alarm.date || "";
+  document.getElementById('alarmAfter').value = "";
+} else {
+  document.getElementById('alarmDate').value = "";
+  document.getElementById('alarmAfter').value = "";
+}
+
+  renderCaptureBoard();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteEntry(id) {
+  if (!confirm("정말 삭제하시겠습니까?")) return;
+
+  db.entries = db.entries.filter(x => x.id !== id);
+
+  // 🔥 데이터 구조 변경 → 버전 갱신
+  db.meta._lastStructuralChange = Date.now(); // 또는 meta에 기록
+  persist();
+  updateSyncStatus();
+  renderAll();
+}
+
+function persist() {
+  localStorage.setItem('rd_v10_5', JSON.stringify(db));
+}
+
+function clearForm() {
+  ['tickerName','tickerCode','sector','tags','content','invalidation','entry','target','stop'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  document.getElementById('status').value = "ACTIVE";
+  document.getElementById('isTrade').checked = false;
+  toggleTradeFields(false);
+  editingId = null;
+  draftLinks = [];
+  draftImages = [];
+  renderCaptureBoard();
+
+document.getElementById('isAlarm').checked = false;
+toggleAlarmFields(false);
+document.getElementById('alarmDate').value = "";
+document.getElementById('alarmAfter').value = "";
+
+}
+
+// ================================================
+// 탭 & 트리 & 모달
+// ================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tabs button').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(`content-${tab}`).classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.add('active');
+
+if (tab === 'explorer') {
+  renderExplorer();
+  renderReviewQueue();
+renderAlarmQueue();
+}
+
+  if (tab === 'report') {
+  renderReportList();
+  updateReportEditorState();
+}
+} // ✅ 이 중괄호 반드시 필요
+
+function selectTree(ticker) {
+  selectedTicker = ticker;
+  renderAll();
+}
+
+function toggleModal(id) {
+  const m = document.getElementById(id);
+  m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+}
+
+
+
+// ================================================
+// 1. 데이터의 실제 최신 수정 시각 계산 (Data Version)
+// ================================================
+function getLocalDataLastTs() {
+  const entryTs = db.entries.map(e => Number(e.updatedAt || e.createdAt || 0));
+  const reportTs = (db.reports || []).map(r => Number(r.updatedAt || r.createdAt || 0));
+  const allTs = [...entryTs, ...reportTs].filter(t => t > 0);
+  
+  return allTs.length === 0 ? 0 : Math.max(...allTs);
+}
+
+// ================================================
+// 2. 동기화 모니터 업데이트 (Alpha Blotter 로직 이식)
+// ================================================
+function updateSyncStatus() {
+  const localTs = Math.floor(getLocalDataLastTs());
+  const imp = Math.floor(db.meta.lastImportAt || 0);
+  const exp = Math.floor(db.meta.lastExportAt || 0);
+  const qsync = Math.floor(db.meta.lastQuoteSyncAt || 0);
+
+  // 화면 표시
+  document.getElementById('localLastTs').textContent =
+    localTs > 0 ? fmtDateTime(localTs) : "-";
+  document.getElementById('importLastTs').textContent =
+    imp > 0 ? fmtDateTime(imp) : "-";
+  document.getElementById('exportLastTs').textContent =
+    exp > 0 ? fmtDateTime(exp) : "-";
+  document.getElementById('quoteLastTs').textContent =
+    qsync > 0 ? fmtDateTime(qsync) : "-";
+
+  const sentinel = document.getElementById('syncSentinel');
+  sentinel.classList.remove('sync-warn', 'sync-danger');
+
+  if (!localTs) return;
+
+  // ✅ 1️⃣ 정상: import 또는 export 중 하나라도 local과 동일
+  if (localTs === imp || localTs === exp) {
+    return; // 정상 상태 → 아무 클래스도 안 붙임
+  }
+
+  // 🚨 2️⃣ 위험: import 데이터가 local보다 최신
+  if (imp > localTs) {
+    sentinel.classList.add('sync-danger');
+    return;
+  }
+
+  // ⚠️ 3️⃣ 경고: local이 export보다 최신
+  if (localTs > exp) {
+    sentinel.classList.add('sync-warn');
+  }
+}
+
+function resetAll() {
+  if (!confirm("모든 데이터를 초기화하시겠습니까?")) return;
+  db = {
+  entries: [],
+  reports: [],
+  meta: { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 }
+};
+  persist();
+  renderAll();
+  updateSyncStatus();
+}
+
+function openImg(src, note = "", idx = null, entryId = null) {
+  const imgEl = document.getElementById('lbImg');
+  const wrapEl = document.getElementById('lbNoteWrap');
+  const inputEl = document.getElementById('lbNoteInput');
+
+  imgEl.onload = () => {
+    resizePenCanvas();
+    clearPenCanvas();
+  };
+  imgEl.src = src;
+
+  lightboxImageIndex = idx;
+  lightboxMode = entryId ? "entry" : "draft";
+  lightboxEntryId = entryId || null;
+
+  wrapEl.style.display = idx !== null ? 'flex' : 'none';
+  inputEl.value = note || "";
+
+  document.getElementById('lightbox').style.display = 'flex';
+}
+
+function resizePenCanvas() {
+  const img = document.getElementById('lbImg');
+  const canvas = document.getElementById('penCanvas');
+  if (!img || !canvas) return;
+
+  canvas.width  = img.clientWidth;
+  canvas.height = img.clientHeight;
+
+  canvas.style.left = img.offsetLeft + 'px';
+  canvas.style.top  = img.offsetTop + 'px';
+}
+
+// ================================================
+// 캡처 보드 (Ctrl+V)
+// ================================================
+function renderCaptureBoard() {
+  const board = document.getElementById('captureBoard');
+  board.innerHTML = "";
+  for (let i = 0; i < 3; i++) {
+    const img = draftImages[i];
+    if (img) {
+      board.innerHTML += `
+      <div class="cap-slot">
+        <img src="${img.src}" onclick="openImg(
+  '${img.src.replace(/'/g,"\\'")}',
+  '${(img.note||"").replace(/'/g,"\\'")}',
+  ${i}
+)">
+        <button class="cap-remove" onclick="draftImages.splice(${i},1); renderCaptureBoard()">×</button>
+        <textarea class="cap-note" placeholder="캡처 메모" oninput="draftImages[${i}].note=this.value">${escapeHtml(img.note||"")}</textarea>
+      </div>`;
+    } else {
+      board.innerHTML += `<div class="cap-slot" style="align-items:center;justify-content:center;"><span style="font-size:10px;color:var(--line);">📸 Ctrl+V</span></div>`;
+    }
+  }
+}
+
+document.addEventListener('paste', e => {
+  if (['TEXTAREA','INPUT'].includes(document.activeElement?.tagName)) return;
+  const file = [...e.clipboardData.items].find(item => item.type.startsWith('image/'));
+  if (file && draftImages.length < 3) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      draftImages.push({ src: ev.target.result, note: "" });
+      renderCaptureBoard();
+    };
+    reader.readAsDataURL(file.getAsFile());
+  }
+});
+
+
+
+
+document.addEventListener('keydown', e => {
+
+
+
+/* ==========================
+   Ctrl + Alt + Q (전체 시세 동기화)
+========================== */
+
+if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'q') {
+  syncQuotes();
+  e.preventDefault();
+  return;
+}
+
+
+
+/* ==========================
+   Ctrl + Shift + Q (현재 시세 갱신)
+========================== */
+
+if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'q') {
+
+  const activeTab =
+    document.querySelector('.tab-content.active')?.id;
+
+  // 1️⃣ Desk 탭
+  if (activeTab === "content-desk") {
+
+    const code =
+      document.getElementById('tickerCode')?.value.trim();
+
+    if (!code) {
+      alert("종목 코드를 입력하세요.");
+      return;
+    }
+
+    fetchQuote(code).then(quote => {
+      if (!quote) return alert("시세 조회 실패");
+
+      alert(
+        `현재가: ${fmtNum(quote.price)}\n` +
+        `기준시각: ${new Date(quote.time).toLocaleString()}`
+      );
+    });
+
+    e.preventDefault();
+    return;
+  }
+
+  // 2️⃣ Report 탭
+  if (activeTab === "content-report") {
+
+    refreshReportPrice();
+    e.preventDefault();
+    return;
+  }
+}
+
+
+  const el = document.activeElement;
+  const isTextarea = el && el.tagName === "TEXTAREA";
+
+  /* ==========================
+     1️⃣ 검색창 이동 (Ctrl + Shift + F)
+  ========================== */
+
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
+
+    const activeTab = document.querySelector('.tab-content.active')?.id;
+
+    if (activeTab === "content-desk") {
+      const input = document.getElementById('treeSearch');
+      input?.focus();
+      input?.select();
+    }
+
+    if (activeTab === "content-explorer") {
+      const input = document.getElementById('explorerGlobalSearch');
+      input?.focus();
+      input?.select();
+    }
+
+if (activeTab === "content-report") {
+  const input = document.getElementById('reportSearch');
+  input?.focus();
+  input?.select();
+}
+
+
+    e.preventDefault();
+    return;
+  }
+
+  /* ==========================
+     2️⃣ 코드 조회 (Ctrl + Shift + C)
+  ========================== */
+
+  /* ==========================
+   Ctrl + Shift + C (코드 조회)
+========================== */
+
+if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'c') {
+
+  const activeTab =
+    document.querySelector('.tab-content.active')?.id;
+
+  if (activeTab === "content-desk") {
+    webMapTicker();
+    e.preventDefault();
+    return;
+  }
+
+  if (activeTab === "content-report") {
+    webMapTickerReport();
+    e.preventDefault();
+    return;
+  }
+
+  // Explorer / Monitor는 무시
+}
+
+
+  /* ==========================
+     3️⃣ 탭 이동 (Ctrl + Alt)
+  ========================== */
+
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'd') {
+    switchTab('desk');
+    e.preventDefault();
+    return;
+  }
+
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'm') {
+    switchTab('monitor');
+    e.preventDefault();
+    return;
+  }
+
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'e') {
+    switchTab('explorer');
+    e.preventDefault();
+    return;
+  }
+
+  if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'r') {
+    switchTab('report');
+    e.preventDefault();
+    return;
+  }
+
+  /* ==========================
+     4️⃣ 카드 저장 (Ctrl + Enter)
+  ========================== */
+
+  /* ==========================
+   Ctrl + Enter (탭별 저장)
+========================== */
+
+if (e.ctrlKey && e.key === 'Enter') {
+
+  const activeTab =
+    document.querySelector('.tab-content.active')?.id;
+
+  // 1️⃣ Desk 탭
+  if (activeTab === "content-desk") {
+    saveEntry();
+    e.preventDefault();
+    return;
+  }
+
+  // 2️⃣ Report 탭
+  if (activeTab === "content-report") {
+    saveReport();
+    e.preventDefault();
+    return;
+  }
+
+  // 3️⃣ 그 외 탭 → 무시
+}
+
+
+  /* ==========================
+     5️⃣ Markdown 단축키
+  ========================== */
+
+  if (!isTextarea) return;
+
+  function wrapSelection(before, after = before) {
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = el.value.substring(start, end);
+
+    el.value =
+      el.value.substring(0, start) +
+      before + selected + after +
+      el.value.substring(end);
+
+    el.focus();
+    el.selectionStart = start + before.length;
+    el.selectionEnd = end + before.length;
+  }
+
+  // Bold
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+    wrapSelection("**");
+    e.preventDefault();
+  }
+
+  // Italic
+  if (e.ctrlKey && e.key.toLowerCase() === 'i') {
+    wrapSelection("*");
+    e.preventDefault();
+  }
+
+  // Underline
+  if (e.ctrlKey && e.key.toLowerCase() === 'u') {
+    wrapSelection("__");
+    e.preventDefault();
+  }
+
+  // Highlight
+  if (e.ctrlKey && e.key.toLowerCase() === 'h') {
+    wrapSelection("==");
+    e.preventDefault();
+  }
+
+});
+
+
+
+function handleImageUpload(files){
+  [...files]
+    .slice(0, 3 - draftImages.length)
+    .forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        draftImages.push({ src: e.target.result, note: "" });
+        renderCaptureBoard();
+      };
+      reader.readAsDataURL(file);
+    });
+}
+
+
+
+// ================================================
+// 내보내기 / 가져오기
+// ================================================
+function exportData() {
+  // 버튼 누른 시각(Date.now())이 아니라, 현재 데이터의 '버전'을 기록
+  const dataVersion = getLocalDataLastTs();
+  
+  db.meta.lastExportAt = dataVersion;
+  persist(); // 기록 후 저장
+
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `research_desk_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  updateSyncStatus();
+}
+
+// ================================================
+// 4. 가져오기 (Import) - 시각 동기화 교정
+// ================================================
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const importedDb = JSON.parse(reader.result);
+      
+      // 파일 내 데이터 시각 전수조사
+      const entryTs = (importedDb.entries || []).map(e => e.updatedAt || e.createdAt || 0);
+      const reportTs = (importedDb.reports || []).map(r => r.updatedAt || r.createdAt || 0);
+      const fileDataVersion = Math.max(0, ...entryTs, ...reportTs);
+
+      // 가져온 데이터의 버전을 meta에 주입
+      if (!importedDb.meta) importedDb.meta = {};
+      importedDb.meta.lastImportAt = fileDataVersion;
+      importedDb.meta.lastExportAt = fileDataVersion; // 가져온 직후엔 내보낸 상태와 같음
+
+      db = importedDb;
+      persist();
+      renderAll();
+      updateSyncStatus();
+      alert("데이터를 성공적으로 가져왔습니다.");
+    } catch (err) {
+      alert("파일 형식이 올바르지 않습니다.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+
+
+async function webMapTicker() {
+  const btn = document.getElementById('lookupBtn');
+  const nameEl = document.getElementById('tickerName');
+  const codeEl = document.getElementById('tickerCode');
+
+  const q = nameEl.value.trim() || codeEl.value.trim();
+  if (!q) return;
+
+  btn.disabled = true;
+  btn.textContent = "조회 중...";
+
+  try {
+    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=10`;
+    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (!data.quotes?.length) {
+      alert("검색 결과가 없습니다.");
+      return;
+    }
+
+    // 1️⃣ 후보 선택
+    let best = data.quotes[0];
+    if (/^[a-zA-Z]+$/.test(q)) {
+      best = data.quotes.find(qt => !qt.symbol?.endsWith('.KS') && !qt.symbol?.endsWith('.KQ')) || best;
+    } else {
+      best = data.quotes.find(qt => qt.symbol?.endsWith('.KS') || qt.symbol?.endsWith('.KQ')) || best;
+    }
+
+    // 2️⃣ Yahoo 원본 symbol 기준으로 국내/해외 판단
+    const rawSymbol = best.symbol || "";
+    const isDomesticResult = /\.KS$|\.KQ$/.test(rawSymbol);
+
+    // 3️⃣ 종목코드는 항상 세팅 (표시용으로만 suffix 제거)
+    codeEl.value = rawSymbol.replace(/\.KS|\.KQ$/, '') || q;
+
+    // 4️⃣ 종목명은 해외 종목일 때만 덮어쓰기
+    if (!isDomesticResult) {
+      nameEl.value = best.shortname || best.longname || q;
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("종목 조회 실패\n" + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "코드 조회";
+  }
+}
+
+
+async function webMapTickerReport() {
+
+  const nameEl = document.getElementById('reportTickerName');
+  const codeEl = document.getElementById('reportTickerCode');
+
+  const q = nameEl.value.trim() || codeEl.value.trim();
+  if (!q) return;
+
+  try {
+
+    const url =
+      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=10`;
+
+    const res = await fetch(
+      `https://corsproxy.io/?${encodeURIComponent(url)}`
+    );
+
+    if (!res.ok) throw new Error();
+
+    const data = await res.json();
+
+    if (!data.quotes?.length) {
+      alert("검색 결과가 없습니다.");
+      return;
+    }
+
+    let best = data.quotes[0];
+
+    // 국내/해외 분기
+    if (/^[a-zA-Z]+$/.test(q)) {
+      best = data.quotes.find(qt =>
+        !qt.symbol?.endsWith('.KS') &&
+        !qt.symbol?.endsWith('.KQ')
+      ) || best;
+    } else {
+      best = data.quotes.find(qt =>
+        qt.symbol?.endsWith('.KS') ||
+        qt.symbol?.endsWith('.KQ')
+      ) || best;
+    }
+
+    const rawSymbol = best.symbol || "";
+
+    codeEl.value = rawSymbol.replace(/\.KS|\.KQ$/, '');
+
+    if (!/\.KS$|\.KQ$/.test(rawSymbol)) {
+      nameEl.value =
+        best.shortname ||
+        best.longname ||
+        q;
+    }
+
+  } catch {
+    alert("종목 조회 실패");
+  }
+}
+
+
+
+async function fetchQuote(ticker) {
+
+  async function tryFetch(symbol) {
+    try {
+
+      const url =
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d`;
+
+      // 🔥 캐시 방지
+      const proxy =
+        `https://corsproxy.io/?${encodeURIComponent(url)}&t=${Date.now()}`;
+
+      const res = await fetch(proxy, { cache: "no-store" });
+      if (!res.ok) return null;
+
+      const data = await res.json();
+      const result = data?.chart?.result?.[0];
+
+      if (!result?.timestamp?.length) return null;
+
+      const timestamps = result.timestamp;
+      const closes =
+        result.indicators?.quote?.[0]?.close;
+
+      if (!closes?.length) return null;
+
+      // 🔥 가장 마지막 유효 가격 찾기
+      let lastIndex = closes.length - 1;
+      while (lastIndex >= 0 && closes[lastIndex] == null) {
+        lastIndex--;
+      }
+
+      if (lastIndex < 0) return null;
+
+      const price = closes[lastIndex];
+      const time = timestamps[lastIndex] * 1000;
+
+      if (typeof price !== "number" || price <= 0) return null;
+
+      return {
+        price: price,
+        time: time
+      };
+
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+
+    // 숫자 코드 = 국내 종목
+    if (/^\d+$/.test(ticker)) {
+
+      let quote = await tryFetch(ticker + ".KS");
+      if (quote !== null) return quote;
+
+      quote = await tryFetch(ticker + ".KQ");
+      if (quote !== null) return quote;
+
+      return null;
+    }
+
+    // 확장자 포함
+    if (ticker.includes(".")) {
+      return await tryFetch(ticker);
+    }
+
+    // 해외 종목
+    return await tryFetch(ticker);
+
+  } catch (err) {
+    console.error(`시세 조회 실패 (${ticker}):`, err);
+    return null;
+  }
+}
+
+async function syncQuotes() {
+  if (!db.entries.length) return alert("저장된 종목이 없습니다.");
+
+  const tickers = [...new Set(db.entries.map(e => e.tickerCode))];
+  let updated = 0;
+
+  for (const ticker of tickers) {
+
+    const quote = await fetchQuote(ticker);
+
+    if (quote !== null) {
+      db.entries.forEach(e => {
+        if (e.tickerCode === ticker) {
+          e.currentPrice = quote.price;
+          e.quoteTime = quote.time;   // 🔥 시세 기준 시각 저장
+        }
+      });
+      updated++;
+    }
+  }
+
+  if (updated > 0) {
+    db.meta.lastQuoteSyncAt = Date.now();
+    persist();
+    renderAll();
+    updateSyncStatus();
+    alert(`총 ${updated}개 종목 시세 업데이트 완료`);
+  } else {
+    alert("시세를 가져오지 못했습니다.\n네트워크 또는 API 상태를 확인해주세요.");
+  }
+}
+
+async function syncSingleQuote(id) {
+
+  const entry = db.entries.find(e => e.id === id);
+  if (!entry) return;
+
+  const quote = await fetchQuote(entry.tickerCode);
+
+  if (quote !== null) {
+
+    entry.currentPrice = quote.price;
+    entry.quoteTime = quote.time;   // 🔥 시세 기준 시각 저장
+    entry.updatedAt = Date.now();
+
+    persist();
+    renderAll();
+    updateSyncStatus();
+
+    alert(
+      `${entry.tickerName}(${entry.tickerCode}) 시세 업데이트\n\n` +
+      `현재가: ${fmtNum(quote.price)}\n` +
+      `기준시각: ${new Date(quote.time).toLocaleString()}`
+    );
+
+  } else {
+    alert("시세 조회에 실패했습니다.");
+  }
+}
+
+
+function getIncomingLinks(id) {
+  return db.entries.filter(e => (e.links||[]).includes(id));
+}
+
+/* ================================
+   라이트박스 메모 단축키 (Ctrl+Enter)
+================================ */
+document.getElementById('lbNoteInput')
+  ?.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') {
+      saveLightboxNote();
+      e.preventDefault();
+    }
+  });
+
+function saveLightboxNote() {
+  if (lightboxImageIndex === null) return;
+  const note = document.getElementById('lbNoteInput').value || "";
+
+  if (lightboxMode === "draft") {
+    if (draftImages[lightboxImageIndex]) {
+      draftImages[lightboxImageIndex].note = note;
+    }
+    renderCaptureBoard();
+  }
+
+  if (lightboxMode === "entry" && lightboxEntryId) {
+    const entry = db.entries.find(e => e.id === lightboxEntryId);
+    if (entry?.images?.[lightboxImageIndex]) {
+      entry.images[lightboxImageIndex].note = note;
+      entry.updatedAt = Date.now();
+      persist();
+      renderAll();
+    }
+  }
+}
+
+
+
+/* ================================
+   Pen & Mouse Drawing (최종본)
+================================ */
+const penCanvas = document.getElementById('penCanvas');
+const penCtx = penCanvas.getContext('2d');
+
+let drawing = false;
+
+penCtx.strokeStyle = '#ef4444';
+penCtx.lineWidth = 2;
+penCtx.lineCap = 'round';
+
+function getPos(e) {
+  const rect = penCanvas.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  };
+}
+
+penCanvas.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') return; // 손가락 제외
+  drawing = true;
+  const { x, y } = getPos(e);
+  penCtx.beginPath();
+  penCtx.moveTo(x, y);
+});
+
+penCanvas.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const { x, y } = getPos(e);
+  penCtx.lineTo(x, y);
+  penCtx.stroke();
+});
+
+['pointerup','pointerleave','pointercancel']
+  .forEach(ev =>
+    penCanvas.addEventListener(ev, () => drawing = false)
+  );
+
+function clearPenCanvas() {
+  penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
+}
+
+function savePenToImage() {
+  const img = document.getElementById('lbImg');
+  const canvas = document.getElementById('penCanvas');
+
+  const merged = document.createElement('canvas');
+  merged.width = canvas.width;
+  merged.height = canvas.height;
+
+  const mctx = merged.getContext('2d');
+  mctx.drawImage(img, 0, 0, merged.width, merged.height);
+  mctx.drawImage(canvas, 0, 0);
+
+  const dataURL = merged.toDataURL();
+
+  // draft 이미지 저장
+  if (lightboxMode === "draft" && lightboxImageIndex !== null) {
+    draftImages[lightboxImageIndex].src = dataURL;
+    draftImages[lightboxImageIndex].note += "\n[펜 메모 포함]";
+    renderCaptureBoard();
+  }
+
+  // entry 이미지 저장
+  if (lightboxMode === "entry" && lightboxEntryId) {
+    const entry = db.entries.find(e => e.id === lightboxEntryId);
+    if (entry?.images?.[lightboxImageIndex]) {
+      entry.images[lightboxImageIndex].src = dataURL;
+      entry.updatedAt = Date.now();
+      persist();
+      renderAll();
+    }
+  }
+
+  clearPenCanvas();
+}
+
+
+function getPlatformLabel(url) {
+  try {
+    if (url.includes("n.news.naver.com")) return "🟢 NAVER NEWS";
+    if (url.includes("youtube.com") || url.includes("youtu.be")) return "🔴 YOUTUBE";
+    if (url.includes("dart.fss.or.kr")) return "🏛️ DART";
+    return new URL(url).hostname;
+  } catch {
+    return "LINK";
+  }
+}
+
+function newReport() {
+  reportDraft = {
+    id: Date.now(),
+    title: "",
+    opinion: "",
+    reportDate: new Date().toISOString().slice(0,10),
+
+    tickerName: "",   // ✅ 추가
+    tickerCode: "",   // ✅ 추가
+    price: null,
+
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    sections: {
+  summary: { text:"", cards:[] },
+  macro: { text:"", cards:[] },
+  sector: { text:"", cards:[] },
+  conclusion: { text:"", cards:[] }
+},
+entries: [] // ← 1번(근거 가설) 전용으로 유지
+
+  };
+  editingReportId = null;
+  bindReportToUI();
+  updateReportEditorState(); // ✅ 추가
+}
+
+
+function openReport(id) {
+  const r = db.reports.find(x => x.id == id);
+  if (!r) return;
+
+  reportDraft = JSON.parse(JSON.stringify(r));
+  editingReportId = r.id;
+
+  // 구버전 호환 처리(지금도 OK)
+  Object.keys(reportDraft.sections || {}).forEach(k => {
+    if (typeof reportDraft.sections[k] === "string") {
+      reportDraft.sections[k] = { text: reportDraft.sections[k], cards: [] };
+    }
+  });
+
+  bindReportToUI();
+  updateReportEditorState(); // ✅ 추가
+}
+
+
+function bindReportToUI() {
+  document.getElementById('reportDate').value = reportDraft.reportDate || "";
+  document.getElementById('reportTitle').value = reportDraft.title || "";
+  document.getElementById('reportOpinion').value = reportDraft.opinion || "";
+
+  ["summary","macro","sector","conclusion"].forEach(sec => {
+  const ta = document.getElementById("sec-" + sec);
+  ta.value = reportDraft.sections[sec]?.text || "";
+
+  ta.oninput = () => {
+    reportDraft.sections[sec]._manualEdited = true;
+  };
+
+  renderReportSectionCards(sec);
+});
+
+  document.getElementById('reportTickerName').value =
+    reportDraft.tickerName || "";
+
+  document.getElementById('reportTickerCode').value =
+    reportDraft.tickerCode || "";
+
+  document.getElementById('reportPrice').value =
+    reportDraft.price != null ? fmtNum(reportDraft.price) : "";
+
+  renderReportEntries();
+
+  bindAutoResizeToReportTextareas();
+}
+
+function removeEntryFromReport(entryId) {
+  reportDraft.entries =
+    reportDraft.entries.filter(id => id !== entryId);
+  renderReportEntries();
+}
+
+
+function renderReportEntries() {
+  const box = document.getElementById('reportEntryList');
+  if (!box) return;
+
+if (!reportDraft.entries.length) {
+  box.innerHTML = `
+    <button class="btn btn-ghost"
+            style="
+              width:100%;
+              padding:14px;
+              border:1px dashed var(--line);
+              background:#f8fafc;
+              color:var(--muted);
+            "
+            onclick="openReportEntryModal()">
+      ➕ 카드 불러오기
+    </button>
+  `;
+  return;
+}
+  box.innerHTML = reportDraft.entries.map(id => {
+    const e = db.entries.find(x => x.id === id);
+    if (!e) return "";
+
+    const seq = getTickerSeq(e);
+
+    return `
+      <div class="report-hypothesis">
+        <div class="report-hypothesis-title"
+     style="cursor:pointer;"
+     onclick="jumpToNote(${e.id})">
+  ${e.tickerName} (${e.tickerCode}) #${seq}
+</div>
+        <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">
+  ${e.date}
+</div>
+
+
+<div style="margin-top:6px;">
+  ${e.sector ? `<span class="meta-pill sector">🏷 ${escapeHtml(e.sector)}</span>` : ''}
+  ${e.tags ? e.tags.split(',').map(t =>
+    `<span class="meta-pill tag">#${escapeHtml(t.trim())}</span>`
+  ).join('') : ''}
+</div>
+
+<div class="report-hypothesis-body" style="white-space:pre-wrap;">
+  ${applyHighlight(e.content)}
+</div>
+
+
+
+
+
+${(e.images || []).length ? `
+  <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap;">
+    ${(e.images || []).map((img, idx) => `
+      <img src="${img.src}"
+           style="
+             width:140px;
+             height:90px;
+             object-fit:cover;
+             border-radius:8px;
+             cursor:pointer;
+             box-shadow:0 2px 6px rgba(0,0,0,.15);
+           "
+           onclick="openImg(
+             '${img.src.replace(/'/g,"\\'")}',
+             '${(img.note||"").replace(/'/g,"\\'")}',
+             ${idx},
+             ${e.id}
+           )">
+    `).join("")}
+  </div>
+` : ''}
+
+
+
+
+${(e.links||[]).length ? `
+<div style="margin-top:8px; font-size:11px; border-top:1px dashed var(--line); padding-top:6px;">
+  <b style="color:var(--accent);">🔗 연결한 가설</b>
+  ${(e.links||[]).map(lid => {
+    const t = db.entries.find(x => x.id === lid);
+    if (!t) return '';
+    return `
+      <div class="link-summary" onclick="jumpToNote(${t.id})">
+        ↳ ${t.tickerName}(${t.tickerCode}) · ${getSummary(t.content)}
+      </div>
+    `;
+  }).join("")}
+</div>
+` : ''}
+
+${getIncomingLinks(e.id).length ? `
+<div style="margin-top:8px; font-size:11px; border-top:1px dashed var(--line); padding-top:6px;">
+  <b style="color:#0369a1;">🔁 나를 참조한 가설</b>
+  ${getIncomingLinks(e.id).map(src => `
+    <div class="link-summary"
+         style="background:#ecfeff; color:#0369a1;"
+         onclick="jumpToNote(${src.id})">
+      ↲ ${src.tickerName}(${src.tickerCode}) · ${getSummary(src.content)}
+    </div>
+  `).join("")}
+</div>
+` : ''}
+
+        ${(e.comments && e.comments.length) ? `
+  <div style="
+    margin-top:6px;
+    padding-top:6px;
+    border-top:1px dashed var(--line);
+    font-size:11px;
+    color:var(--muted);
+  ">
+    <b>💬 참고 의견</b>
+    ${(e.comments || []).slice(-3).map(c => `
+      <div style="margin-top:4px;">
+        • ${escapeHtml(c.text)}
+      </div>
+    `).join("")}
+  </div>
+` : ''}
+
+
+
+        <button class="btn btn-mini btn-ghost"
+                onclick="removeEntryFromReport(${id})">✕</button>
+      </div>
+    `;
+  }).join('');
+
+box.innerHTML += `
+  <button class="btn btn-ghost btn-mini"
+          style="margin-top:6px;"
+          onclick="openReportEntryModal()">
+    ➕ 카드 추가
+  </button>
+`;
+
+}
+
+function saveReport() {
+  reportDraft.title =
+    document.getElementById('reportTitle').value.trim();
+  reportDraft.opinion =
+    document.getElementById('reportOpinion').value.trim();
+  reportDraft.reportDate =
+    document.getElementById('reportDate').value;
+
+  ["summary","macro","sector","conclusion"].forEach(sec => {
+    reportDraft.sections[sec].text =
+      document.getElementById("sec-" + sec).value;
+  });
+
+  reportDraft.price =
+    Number(document.getElementById('reportPrice').value.replace(/,/g,'')) || null;
+
+  reportDraft.tickerName =
+    document.getElementById('reportTickerName').value.trim();
+
+  reportDraft.tickerCode =
+    document.getElementById('reportTickerCode').value.trim();
+
+  reportDraft.updatedAt = Date.now();
+
+  if (editingReportId) {
+    db.reports = db.reports.map(r =>
+      r.id === editingReportId ? reportDraft : r
+    );
+  } else {
+    db.reports.unshift(reportDraft);
+  }
+
+  editingReportId = reportDraft.id;
+  persist();
+  renderReportList();
+  updateSyncStatus();
+}
+
+
+function printReport() {
+  window.print();
+}
+
+
+function openReportEntryModal() {
+  if (!reportDraft) {
+    alert("먼저 신규 레포트를 생성하세요.");
+    return;
+  }
+  linkingTargetId = "__REPORT__"; // 구분자
+  document.getElementById('linkSearch').value = "";
+  renderLinkOptions("");
+  toggleModal('linkModal');
+}
+
+
+
+
+
+function renderReportList() {
+  const box = document.getElementById('reportList');
+  if (!box) return;
+
+  box.innerHTML = db.reports.map(r => `
+    <div class="explorer-item"
+         style="position:relative;"
+         onclick="openReport(${r.id})">
+
+      <div style="font-weight:900;">
+        ${r.title || "(제목 없음)"}
+      </div>
+
+      <div style="font-size:11px; color:var(--muted);">
+        ${r.reportDate || ""}
+      </div>
+
+      <!-- ❌ 삭제 버튼 (여기!) -->
+      <button class="btn btn-mini btn-ghost"
+              style="
+                position:absolute;
+                top:10px;
+                right:10px;
+                color:var(--danger);
+              "
+              onclick="event.stopPropagation(); deleteReport(${r.id})">
+        🗑
+      </button>
+    </div>
+  `).join('') || `
+    <div style="font-size:12px; color:var(--muted);">
+      저장된 레포트 없음
+    </div>
+  `;
+
+
+}
+
+
+function deleteReport(id) {
+  if (!confirm("이 레포트를 삭제하시겠습니까?")) return;
+
+  db.reports = db.reports.filter(r => r.id !== id);
+
+  // 현재 편집 중인 레포트라면 에디터 초기화
+  if (editingReportId === id) {
+    reportDraft = null;
+    editingReportId = null;
+
+    document.getElementById('reportTitle').value = "";
+    document.getElementById('reportOpinion').value = "";
+    document.getElementById('reportDate').value = "";
+
+    document.getElementById('sec-summary').value = "";
+    document.getElementById('sec-macro').value = "";
+    document.getElementById('sec-sector').value = "";
+    document.getElementById('sec-conclusion').value = "";
+
+    document.getElementById('reportEntryList').innerHTML = "";
+
+  updateReportEditorState(); // ✅ 추가
+  }
+
+  persist();
+  renderReportList();
+  updateSyncStatus();
+}
+
+function renderReportSelector() {
+  const sel = document.getElementById('reportSelector');
+  sel.innerHTML =
+    `<option value="">📄 레포트 선택</option>` +
+    db.reports.map(r =>
+      `<option value="${r.id}">
+        ${r.reportDate || "----.--.--"} | ${r.title || "(제목 없음)"}
+      </option>`
+    ).join('');
+}
+
+
+async function refreshReportPrice() {
+  if (!reportDraft) return;
+
+  const code = document.getElementById('reportTickerCode').value.trim();
+  if (!code) return alert("대표 종목 코드를 입력하세요.");
+
+  const quote = await fetchQuote(code);
+  if (!quote) return alert("시세 조회 실패");
+
+  if (!confirm(`자동 시세 ${fmtNum(quote.price)}로 덮어쓸까요?`)) return;
+
+  reportDraft.price = quote.price;
+
+  document.getElementById('reportPrice').value =
+    fmtNum(quote.price);
+
+  reportDraft.updatedAt = Date.now();
+
+  persist();
+  updateSyncStatus();
+}
+
+
+
+function openReportSectionEntryModal(section) {
+  if (!reportDraft) {
+    alert("먼저 신규 레포트를 생성하세요.");
+    return;
+  }
+  reportTargetSection = section;
+  linkingTargetId = "__REPORT_SECTION__";
+  document.getElementById('linkSearch').value = "";
+  renderLinkOptions("");
+  toggleModal('linkModal');
+}
+
+function confirmReportSectionLink(targetId) {
+  if (!reportDraft || !reportTargetSection) return;
+
+  const sec = reportDraft.sections[reportTargetSection];
+  if (!sec.cards.includes(targetId)) {
+    sec.cards.push(targetId);
+
+    // 🔹 자동 문단 생성
+    autoExpandSectionText(reportTargetSection);
+
+    // 🔹 카드 리스트 갱신
+    renderReportSectionCards(reportTargetSection);
+
+    // 🔹 🔥 textarea 즉시 반영 (핵심)
+    const ta = document.getElementById("sec-" + reportTargetSection);
+    if (ta) ta.value = sec.text || "";
+  autoResizeTextarea(ta); // ✅ 추가
+  }
+
+  toggleModal('linkModal');
+}
+
+function autoExpandSectionText(section) {
+  const sec = reportDraft.sections[section];
+  if (sec._manualEdited) return;
+
+  const cards = sec.cards
+    .map(id => db.entries.find(e => e.id === id))
+    .filter(Boolean);
+
+  sec.text = cards.map(e => {
+    return [
+      `• [${e.tickerName}(${e.tickerCode})] ${e.date}`,
+      e.content || "(본문 없음)",
+      e.invalidation ? `\n[Risk]\n${e.invalidation}` : ""
+    ].join("\n");
+  }).join("\n\n---\n\n");
+}
+
+
+function resetReportEditor() {
+  if (!reportDraft) return;
+
+  const isNew = !editingReportId;
+
+  if (!confirm(
+    isNew
+      ? "신규 레포트 입력을 초기화할까요?"
+      : "저장된 레포트 상태로 되돌릴까요?"
+  )) return;
+
+  if (isNew) {
+    newReport();
+  } else {
+    const r = db.reports.find(x => x.id === editingReportId);
+    reportDraft = JSON.parse(JSON.stringify(r));
+    bindReportToUI();
+    updateReportEditorState(); // ✅ 추가
+  }
+}
+
+
+function renderReportSectionCards(section) {
+  const box = document.getElementById(section + "CardList");
+  if (!box || !reportDraft) return;
+
+  const sec = reportDraft.sections[section];
+
+  box.innerHTML = sec.cards.map(id => {
+    const e = db.entries.find(x => x.id === id);
+    if (!e) return "";
+
+    // 📸 캡쳐 미리보기
+    const imagesHtml = (e.images || [])
+      .slice(0, 2)
+      .map(img => `
+<img src="${img.src}"
+     style="
+       width:120px;
+       height:80px;
+       object-fit:cover;
+       border-radius:6px;
+       cursor:pointer;
+       box-shadow:0 2px 6px rgba(0,0,0,.1);
+     "
+     onclick="openImg(
+       '${img.src.replace(/'/g,"\\'")}',
+       '${(img.note||"").replace(/'/g,"\\'")}',
+       0,
+       ${e.id}
+     )">      `).join("");
+
+const commentsHtml = (e.comments || []).length
+  ? `
+    <div style="
+      margin-top:8px;
+      padding-top:6px;
+      border-top:1px dashed var(--line);
+      font-size:11px;
+      color:var(--muted);
+    ">
+      <b>💬 참고 의견</b>
+      ${(e.comments || []).slice(-3).map(c => `
+        <div style="margin-top:4px;">
+          • ${escapeHtml(c.text)}
+        </div>
+      `).join("")}
+    </div>
+  `
+  : "";
+
+    return `
+      <div style="
+        position:relative;
+        border:1px dashed var(--line);
+        border-radius:8px;
+        padding:10px;
+        background:#f8fafc;
+        margin-bottom:10px;
+      ">
+
+        <!-- ❌ 삭제 버튼 -->
+        <button class="btn btn-mini btn-ghost"
+                style="position:absolute; top:6px; right:6px; color:var(--danger);"
+                onclick="removeReportSectionCard('${section}', ${id})">
+          ✕
+        </button>
+
+        <div class="link-summary"
+             onclick="jumpToNote(${e.id})"
+
+
+             style="margin-bottom:6px;">
+          ${e.tickerName}(${e.tickerCode}) · ${e.date}
+        </div>
+
+
+
+
+<div style="margin-bottom:6px;">
+  ${e.sector ? `<span class="meta-pill sector">🏷 ${escapeHtml(e.sector)}</span>` : ''}
+  ${e.tags ? e.tags.split(',').map(t =>
+    `<span class="meta-pill tag">#${escapeHtml(t.trim())}</span>`
+  ).join('') : ''}
+</div>
+
+
+<div style="
+  margin:6px 0 8px;
+  font-size:12px;
+  line-height:1.6;
+  color:var(--text);
+  white-space:pre-wrap;
+">
+  ${applyHighlight(getSummary(e.content))}
+</div>
+
+
+
+        ${imagesHtml
+          ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">${imagesHtml}</div>`
+          : `<div style="font-size:11px; color:var(--muted);"></div>`
+        }
+
+${(e.links||[]).length ? `
+<div style="margin-top:8px; font-size:11px; border-top:1px dashed var(--line); padding-top:6px;">
+  <b style="color:var(--accent);">🔗 연결한 가설</b>
+  ${(e.links||[]).map(lid => {
+    const t = db.entries.find(x => x.id === lid);
+    if (!t) return '';
+    return `
+      <div class="link-summary" onclick="jumpToNote(${t.id})">
+        ↳ ${t.tickerName}(${t.tickerCode}) · ${getSummary(t.content)}
+      </div>
+    `;
+  }).join("")}
+</div>
+` : ''}
+
+${getIncomingLinks(e.id).length ? `
+<div style="margin-top:8px; font-size:11px; border-top:1px dashed var(--line); padding-top:6px;">
+  <b style="color:#0369a1;">🔁 나를 참조한 가설</b>
+  ${getIncomingLinks(e.id).map(src => `
+    <div class="link-summary"
+         style="background:#ecfeff; color:#0369a1;"
+         onclick="jumpToNote(${src.id})">
+      ↲ ${src.tickerName}(${src.tickerCode}) · ${getSummary(src.content)}
+    </div>
+  `).join("")}
+</div>
+` : ''}
+
+${commentsHtml}
+      </div>
+    `;
+  }).join("");
+}
+
+
+function removeReportSectionCard(section, entryId) {
+  if (!reportDraft) return;
+
+  const sec = reportDraft.sections[section];
+
+  // 카드 제거
+  sec.cards = sec.cards.filter(id => id !== entryId);
+
+  // 🔹 본문 자동 재생성 (비어있을 때만)
+  sec.text = "";
+  autoExpandSectionText(section);
+
+  // 🔹 textarea 즉시 반영
+  const ta = document.getElementById("sec-" + section);
+  if (ta) ta.value = sec.text || "";
+
+  // 🔹 카드 UI 갱신
+  renderReportSectionCards(section);
+}
+
+function updateReportEditorState() {
+  const blank = document.getElementById('reportBlankState');
+  const body  = document.getElementById('reportEditorBody');
+
+  if (!reportDraft) {
+    blank.style.display = 'block';
+    body.style.display = 'none';
+  } else {
+    blank.style.display = 'none';
+    body.style.display = 'block';
+  }
+}
+
+
+/* ===============================
+   Report textarea 자동 높이 조절
+=============================== */
+
+function autoResizeTextarea(el) {
+  if (!el) return;
+
+  // 높이를 일단 최소로 줄였다가
+  el.style.height = "auto";
+
+  // 실제 내용 높이로 다시 설정
+  el.style.height = (el.scrollHeight + 2) + "px";
+}
+
+/* Report 에디터 내 textarea 전체에 적용 */
+function bindAutoResizeToReportTextareas() {
+  const areas = document.querySelectorAll(
+    "#reportEditorBody textarea"
+  );
+
+  areas.forEach(ta => {
+    // 입력 시 자동 확장
+    ta.addEventListener("input", () => autoResizeTextarea(ta));
+
+    // 초기 로드 시에도 1회 실행
+    setTimeout(() => autoResizeTextarea(ta), 0);
+  });
+}
+
+
+
+function getReportsUsingEntry(entryId) {
+  if (!db.reports) return [];
+
+  return db.reports.filter(r => {
+    // 1️⃣ 근거 가설
+    if ((r.entries || []).includes(entryId)) return true;
+
+    // 2️⃣ 섹션 카드
+    const secs = r.sections || {};
+    return Object.values(secs).some(sec =>
+      (sec.cards || []).includes(entryId)
+    );
+  });
+}
+
+
+function fmtDateTime(ts) {
+  if (!ts) return "-";
+  const d = new Date(ts);
+
+  // 날짜: YY.MM.DD / 시각: HH:MM
+  const date =
+    String(d.getFullYear()).slice(2) + "." +
+    (d.getMonth() + 1) + "." +
+    d.getDate();
+
+  const time =
+    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  return date + "\n" + time;
+}
+
+function removeEntryLink(entryId, targetId) {
+  const entry = db.entries.find(e => e.id === entryId);
+  if (!entry) return;
+
+  entry.links = (entry.links || []).filter(id => id !== targetId);
+  entry.updatedAt = Date.now(); // 🔥 필수
+
+  persist();
+  renderAll();
+  updateSyncStatus();
+}
+
+
+
+function getAgeDays(e) {
+  const base = e.createdAt || e.updatedAt || 0;
+  return Math.floor((Date.now() - base) / 86400000);
+}
+
+
+function getAgeBucket(days) {
+  if (days >= 360) return { key: "360", label: "1년+", color:"#7c2d12", bg:"#ffedd5" };
+  if (days >= 180) return { key: "180", label: "6개월+", color:"#92400e", bg:"#fef3c7" };
+  if (days >= 30)  return { key: "30",  label: "1개월+", color:"#9a3412", bg:"#fde68a" };
+  if (days >= 14)  return { key: "14",  label: "2주+", color:"#a16207", bg:"#fef3c7" };
+  if (days >= 7)   return { key: "7",   label: "1주+", color:"#0369a1", bg:"#ecfeff" };
+  return null;
+}
+
+
+function getReviewGroups() {
+  const groups = { "7":[], "14":[], "30":[], "180":[], "360":[] };
+
+  db.entries.forEach(e => {
+    const days = getAgeDays(e);
+    if (days >= 360) groups["360"].push(e);
+    else if (days >= 180) groups["180"].push(e);
+    else if (days >= 30) groups["30"].push(e);
+    else if (days >= 14) groups["14"].push(e);
+    else if (days >= 7) groups["7"].push(e);
+  });
+
+  return groups;
+}
+
+
+function renderReviewQueue() {
+  const box = document.getElementById("reviewQueue");
+  if (!box) return;
+
+  const groups = getReviewGroups();
+
+  const order = ["360","180","30","14","7"];
+  const labels = {
+    "7":"7일 이상",
+    "14":"14일 이상",
+    "30":"30일 이상",
+    "180":"180일 이상",
+    "360":"360일 이상"
+  };
+
+  box.innerHTML = order.map(k => {
+    if (!groups[k].length) return "";
+
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:12px; font-weight:900; color:var(--accent); margin-bottom:4px;">
+          ⏳ ${labels[k]} (${groups[k].length})
+        </div>
+        ${groups[k].slice(0,10).map(e => `
+          <div class="explorer-item"
+               onclick="jumpToNote(${e.id})">
+            <b>${e.tickerName}(${e.tickerCode})</b>
+            <span style="font-size:11px; color:var(--muted); margin-left:6px;">
+              ${e.date}
+            </span>
+            <div style="font-size:12px; margin-top:2px;">
+              ${applyHighlight(getSummary(e.content))}
+            </div>
+<div style="margin-top:4px; display:flex; gap:8px; font-size:11px; color:var(--muted);">
+  ${(e.images || []).length ? '📸 캡쳐' : ''}
+  ${(e.links || []).length ? '🔗 링크' : ''}
+  ${(e.comments || []).length ? '💬 댓글' : ''}
+</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }).join("") || `<div style="font-size:12px; color:var(--muted);">리뷰 대상 없음</div>`;
+}
+
+function toggleAlarmFields(on){
+  document.getElementById('alarmFields')
+    .classList.toggle('hidden', !on);
+}
+
+
+function checkAlarms() {
+  const today = new Date().toISOString().split('T')[0];
+
+  const due = db.entries.filter(e =>
+    e.isAlarm &&
+    e.alarm &&
+    !e.alarm.done &&
+    e.alarm.date &&
+    e.alarm.date <= today
+  );
+
+  if (!due.length) return;
+
+  alert(
+    "🔔 오늘 확인할 가설\n\n" +
+    due.map(e => `• ${e.tickerName} (${e.sector || "섹터 없음"})`).join('\n')
+  );
+
+  due.forEach(e => {
+    e.alarm.done = true;
+    e.updatedAt = Date.now();
+  });
+
+  persist();
+renderAll();
+updateSyncStatus();
+}
+
+
+function renderAlarmQueue() {
+  const box = document.getElementById("alarmQueue");
+  if (!box) return;
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // 🔹 D-day / D-1 / D-7 그룹
+  const groups = {
+    today: [],
+    d1: [],
+    d7: []
+  };
+
+  db.entries.forEach(e => {
+    if (
+      !e.isAlarm ||
+      !e.alarm ||
+      e.alarm.done ||
+      !e.alarm.date
+    ) return;
+
+    const alarmDate = new Date(e.alarm.date);
+    alarmDate.setHours(0,0,0,0);
+
+    const diff =
+      Math.floor((alarmDate - today) / 86400000);
+
+    if (diff === 0) groups.today.push(e);
+    else if (diff === 1) groups.d1.push(e);
+    else if (diff > 1 && diff <= 7) groups.d7.push(e);
+  });
+
+  const renderGroup = (label, color, list) => {
+    if (!list.length) return "";
+
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="
+          font-size:12px;
+          font-weight:900;
+          color:${color};
+          margin-bottom:6px;
+        ">
+          ${label} (${list.length})
+        </div>
+
+
+${list.map(e => {
+  return `
+<div class="explorer-item"
+     onclick="jumpToNote(${e.id})"
+     style="border-left:4px solid ${color};">
+
+  <b>${e.tickerName} (${e.tickerCode})</b>
+
+  ${e.sector ? `<span class="meta-pill sector"
+      onclick="event.stopPropagation(); searchByMeta('sector','${e.sector}')"
+      style="cursor:pointer;">
+  🏷 ${e.sector}
+</span>` : ''}
+  ${e.tags ? e.tags.split(',').map(t =>
+    `<span class="meta-pill tag">#${t.trim()}</span>`
+  ).join('') : ''}
+
+  <span style="font-size:11px; color:var(--muted); margin-left:6px;">
+    ${e.alarm.date}
+  </span>
+
+  <div style="font-size:12px; margin-top:4px;">
+    ${applyHighlight(getSummary(e.content))}
+  </div>
+
+${e.images && e.images.length ? `
+<div
+  onclick="event.stopPropagation(); openImg(
+    '${e.images[0].src.replace(/'/g,"\\'")}',
+    '${(e.images[0].note||"").replace(/'/g,"\\'")}',
+    0,
+    ${e.id}
+  )"
+  style="
+    margin-top:8px;
+    display:inline-block;
+  ">
+  <img src="${e.images[0].src}"
+       style="
+         width:120px;
+         height:80px;
+         object-fit:cover;
+         border-radius:8px;
+         cursor:pointer;
+         box-shadow:0 2px 6px rgba(0,0,0,.12);
+       ">
+</div>
+` : ''}
+
+<!-- 🔗 연결된 가설 미리보기 -->
+${(e.links || []).length ? `
+<div style="
+  margin-top:8px;
+  font-size:11px;
+  padding-top:6px;
+  border-top:1px dashed var(--line);
+">
+  <b style="color:var(--accent);">🔗 연결된 가설</b>
+  ${(e.links || []).slice(0,2).map(lid => {
+    const t = db.entries.find(x => x.id === lid);
+    if (!t) return '';
+    return `
+      <div class="link-summary"
+           style="margin-top:4px;"
+           onclick="event.stopPropagation(); jumpToNote(${t.id})">
+        ↳ ${t.tickerName}(${t.tickerCode}) · ${getSummary(t.content)}
+      </div>
+    `;
+  }).join('')}
+</div>
+` : ''}
+
+<!-- 💬 댓글 미리보기 -->
+${(e.comments || []).length ? `
+<div style="
+  margin-top:8px;
+  font-size:11px;
+  padding-top:6px;
+  border-top:1px dashed var(--line);
+">
+  <b style="color:var(--muted);">💬 댓글</b>
+  ${(e.comments || []).slice(-2).map(c => `
+    <div style="margin-top:4px;">
+      • ${escapeHtml(c.text)}
+    </div>
+  `).join('')}
+</div>
+` : ''}
+
+
+
+</div>
+`;
+}).join("")}
+
+      </div>
+    `;
+  };
+
+  box.innerHTML =
+    renderGroup("🔥 D-day (오늘)", "var(--danger)", groups.today) +
+    renderGroup("⚠️ D-1 (내일)", "var(--warning)", groups.d1) +
+    renderGroup("🕒 D-7 (7일 이내)", "var(--accent)", groups.d7)
+    || `<div style="font-size:12px; color:var(--muted);">
+          알람 대기 없음
+        </div>`;
+}
+
+
+function searchByMeta(type, value) {
+  // 1️⃣ Explorer 탭으로 이동
+  switchTab('explorer');
+
+  // 2️⃣ 검색어 구성
+  const q =
+    type === 'sector'
+      ? value
+      : value; // 태그도 동일하게 문자열 검색
+
+  // 3️⃣ Explorer 검색창에 주입
+  const input = document.getElementById('explorerGlobalSearch');
+  if (input) {
+    input.value = q;
+  }
+
+  // 4️⃣ 즉시 렌더
+  renderExplorer();
+}
+
+function handleDeskSearch(q) {
+  deskSearchQuery = (q || "").toLowerCase();
+
+  // 좌측 트리 갱신
+  renderTree(q);
+
+  // 우측 타임라인 즉시 갱신
+  renderTimeline();
+}
+
+function searchDeskByMeta(value) {
+  // Desk 탭 유지
+  switchTab('desk');
+
+  // 검색창에 값 주입
+  const input = document.getElementById('treeSearch');
+  if (input) {
+    input.value = value;
+  }
+
+  // Desk 검색 상태 갱신
+  handleDeskSearch(value);
+}
+
+function applyHighlight(text) {
+  if (!text) return "";
+
+  let t = escapeHtml(text);
+
+  /* -------------------------
+     Research Markup (기존)
+  --------------------------*/
+  t = t
+    .replace(/\[\[(.*?)\]\]/g,
+      `<span class="hl-mark-url">$1</span>`)
+    .replace(/\{\{(.*?)\}\}/g,
+      `<span class="hl-mark-code">$1</span>`)
+    .replace(/==(.*?)==/g,
+      `<span class="hl-mark-tag">$1</span>`);
+
+  /* -------------------------
+     Markdown Support
+  --------------------------*/
+
+  // Headings
+  t = t.replace(/^### (.*)$/gm,
+      `<div class="md-h3">$1</div>`);
+  t = t.replace(/^## (.*)$/gm,
+      `<div class="md-h2">$1</div>`);
+  t = t.replace(/^# (.*)$/gm,
+      `<div class="md-h1">$1</div>`);
+
+// Bold 먼저
+t = t.replace(/\*\*(.*?)\*\*/g,
+    `<span class="md-bold">$1</span>`);
+
+// Underline
+t = t.replace(/__(.*?)__/g,
+    `<span class="md-underline">$1</span>`);
+
+// Italic (단일 별표만)
+t = t.replace(/(^|[^*])\*(?!\*)(.*?)\*(?!\*)/g,
+    `$1<span class="md-italic">$2</span>`);
+
+  // Blockquote
+  t = t.replace(/^&gt; (.*)$/gm,
+      `<div class="md-quote">$1</div>`);
+
+  // Horizontal Rule
+  t = t.replace(/^---$/gm,
+      `<div class="md-hr"></div>`);
+
+  // Unordered List
+  t = t.replace(/^- (.*)$/gm,
+      `<div class="md-li">$1</div>`);
+
+  return t;
+}
+
+
+function filterReport() {
+
+  const keyword =
+    document.getElementById('reportSearch')
+      ?.value.toLowerCase() || "";
+
+  const items =
+    document.querySelectorAll('#reportList .explorer-item');
+
+  items.forEach(item => {
+
+    const text = item.innerText.toLowerCase();
+
+    item.style.display =
+      text.includes(keyword) ? "" : "none";
+
+  });
+
+}
+
+
+
+
+</script>
+</body>
+</html>
