@@ -59,28 +59,28 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
 .btn:disabled{opacity:.6; cursor:not-allowed;}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; position:relative; transition:.3s; margin-bottom:15px;}
 /* ✅ [FIX] 카드 헤더 우측 버튼: 글자 줄바꿈 방지 + 공간 부족 시 버튼은 아래로 */
-.card-header > div:last-child{
+/* 카드 헤더 레이아웃 고정 */
+.card-header{
   display:flex;
-  gap:6px;
-  align-items:flex-start;
-  flex-wrap:wrap;              /* 버튼은 내려가도 OK */
+  justify-content:space-between;
+  gap:10px;
 }
 
-/* 버튼 텍스트는 무조건 한 줄 */
-.card-header .btn{
-  white-space: nowrap;         /* 🔑 "📊 시세 갱신" 같은 텍스트 줄바꿈 금지 */
-  flex: 0 0 auto;              /* 버튼이 찌그러지지 않게 */
-}
-
-/* mini 버튼 최소 폭 보정 */
-.card-header .btn-mini{
-  min-width: 90px;
-  justify-content: center;
-}
-
-/* (선택) 왼쪽 제목 영역이 너무 커서 버튼을 밀어내는 것 방지 */
+/* 왼쪽 영역은 줄어들 수 있게 (핵심) */
 .card-header > div:first-child{
-  min-width:0;
+  flex: 1 1 auto;
+  min-width: 0;        /* ✅ 이게 없으면 말줄임/축소가 잘 안 먹음 */
+}
+
+/* 오른쪽 버튼은 폭 고정 + 줄바꿈 금지 */
+.card-header > div:last-child{
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+/* 버튼 텍스트 줄바꿈 금지 (한 버튼 안에서 두 줄 되는 것 방지) */
+.card-header .btn{
+  white-space: nowrap;
 }.card-title{font-weight:900; color:var(--accent); cursor:pointer; font-size:15px;}
 .card-title:hover{text-decoration:underline;}
 .link-summary{font-size:12px; color:var(--accent); background:var(--accent-light); padding:4px 10px; border-radius:6px; display:inline-block; margin-top:4px; cursor:pointer; font-weight:700;}
