@@ -58,8 +58,30 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
 .btn-mini{padding:4px 8px; font-size:10px; border-radius:6px;}
 .btn:disabled{opacity:.6; cursor:not-allowed;}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; position:relative; transition:.3s; margin-bottom:15px;}
-.card-header{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid #f1f5f9; padding-bottom:10px;}
-.card-title{font-weight:900; color:var(--accent); cursor:pointer; font-size:15px;}
+/* ✅ [FIX] 카드 헤더 우측 버튼: 글자 줄바꿈 방지 + 공간 부족 시 버튼은 아래로 */
+.card-header > div:last-child{
+  display:flex;
+  gap:6px;
+  align-items:flex-start;
+  flex-wrap:wrap;              /* 버튼은 내려가도 OK */
+}
+
+/* 버튼 텍스트는 무조건 한 줄 */
+.card-header .btn{
+  white-space: nowrap;         /* 🔑 "📊 시세 갱신" 같은 텍스트 줄바꿈 금지 */
+  flex: 0 0 auto;              /* 버튼이 찌그러지지 않게 */
+}
+
+/* mini 버튼 최소 폭 보정 */
+.card-header .btn-mini{
+  min-width: 90px;
+  justify-content: center;
+}
+
+/* (선택) 왼쪽 제목 영역이 너무 커서 버튼을 밀어내는 것 방지 */
+.card-header > div:first-child{
+  min-width:0;
+}.card-title{font-weight:900; color:var(--accent); cursor:pointer; font-size:15px;}
 .card-title:hover{text-decoration:underline;}
 .link-summary{font-size:12px; color:var(--accent); background:var(--accent-light); padding:4px 10px; border-radius:6px; display:inline-block; margin-top:4px; cursor:pointer; font-weight:700;}
 .link-summary:hover{background:var(--accent); color:white;}
