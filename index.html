@@ -2506,14 +2506,34 @@ async function webMapTicker() {
   const nameEl = document.getElementById('tickerName');
   const codeEl = document.getElementById('tickerCode');
 
-  const q = nameEl.value.trim() || codeEl.value.trim();
-  if (!q) return;
+  const qRaw = (nameEl.value.trim() || codeEl.value.trim());
+  if (!qRaw) return;
 
+  // ✅ 0) 로컬 DB 우선 매칭 (종목명 기준)
+  const q = qRaw.toLowerCase();
+
+  // 최근 입력된 것(최신) 우선으로 찾기 위해 entries 순서를 그대로 사용(현재 unshift라 최신이 앞)
+  const hit = db.entries.find(e =>
+    (e.tickerName || "").trim().toLowerCase() === q
+  );
+
+  if (hit) {
+    codeEl.value = (hit.tickerCode || "").replace(/\.KS|\.KQ$/i, "");
+    // 종목명은 사용자가 입력한 걸 존중(덮어쓰기 원하면 아래 주석 해제)
+    // nameEl.value = hit.tickerName || nameEl.value;
+
+    // UX: “로컬에서 찾음” 표시(선택)
+    btn.textContent = "✅ 로컬 매칭";
+    setTimeout(() => (btn.textContent = "코드 조회"), 800);
+    return;
+  }
+
+  // ✅ 1) 없을 때만 Yahoo 조회로 진행
   btn.disabled = true;
   btn.textContent = "조회 중...";
 
   try {
-    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=10`;
+    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(qRaw)}&quotesCount=10`;
     const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -2523,24 +2543,20 @@ async function webMapTicker() {
       return;
     }
 
-    // 1️⃣ 후보 선택
     let best = data.quotes[0];
-    if (/^[a-zA-Z]+$/.test(q)) {
+    if (/^[a-zA-Z]+$/.test(qRaw)) {
       best = data.quotes.find(qt => !qt.symbol?.endsWith('.KS') && !qt.symbol?.endsWith('.KQ')) || best;
     } else {
       best = data.quotes.find(qt => qt.symbol?.endsWith('.KS') || qt.symbol?.endsWith('.KQ')) || best;
     }
 
-    // 2️⃣ Yahoo 원본 symbol 기준으로 국내/해외 판단
     const rawSymbol = best.symbol || "";
     const isDomesticResult = /\.KS$|\.KQ$/.test(rawSymbol);
 
-    // 3️⃣ 종목코드는 항상 세팅 (표시용으로만 suffix 제거)
-    codeEl.value = rawSymbol.replace(/\.KS|\.KQ$/, '') || q;
+    codeEl.value = rawSymbol.replace(/\.KS|\.KQ$/, '') || qRaw;
 
-    // 4️⃣ 종목명은 해외 종목일 때만 덮어쓰기
     if (!isDomesticResult) {
-      nameEl.value = best.shortname || best.longname || q;
+      nameEl.value = best.shortname || best.longname || qRaw;
     }
 
   } catch (err) {
@@ -2552,64 +2568,52 @@ async function webMapTicker() {
   }
 }
 
-
 async function webMapTickerReport() {
-
   const nameEl = document.getElementById('reportTickerName');
   const codeEl = document.getElementById('reportTickerCode');
 
-  const q = nameEl.value.trim() || codeEl.value.trim();
-  if (!q) return;
+  const qRaw = (nameEl.value.trim() || codeEl.value.trim());
+  if (!qRaw) return;
 
+  // ✅ 로컬 DB 우선 매칭
+  const q = qRaw.toLowerCase();
+  const hit = db.entries.find(e =>
+    (e.tickerName || "").trim().toLowerCase() === q
+  );
+
+  if (hit) {
+    codeEl.value = (hit.tickerCode || "").replace(/\.KS|\.KQ$/i, "");
+    // nameEl.value = hit.tickerName || nameEl.value;
+    return;
+  }
+
+  // 없으면 기존 Yahoo 조회 로직 계속...
   try {
-
-    const url =
-      `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=10`;
-
-    const res = await fetch(
-      `https://corsproxy.io/?${encodeURIComponent(url)}`
-    );
-
+    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(qRaw)}&quotesCount=10`;
+    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
     if (!res.ok) throw new Error();
-
     const data = await res.json();
-
-    if (!data.quotes?.length) {
-      alert("검색 결과가 없습니다.");
-      return;
-    }
+    if (!data.quotes?.length) return alert("검색 결과가 없습니다.");
 
     let best = data.quotes[0];
 
-    // 국내/해외 분기
-    if (/^[a-zA-Z]+$/.test(q)) {
-      best = data.quotes.find(qt =>
-        !qt.symbol?.endsWith('.KS') &&
-        !qt.symbol?.endsWith('.KQ')
-      ) || best;
+    if (/^[a-zA-Z]+$/.test(qRaw)) {
+      best = data.quotes.find(qt => !qt.symbol?.endsWith('.KS') && !qt.symbol?.endsWith('.KQ')) || best;
     } else {
-      best = data.quotes.find(qt =>
-        qt.symbol?.endsWith('.KS') ||
-        qt.symbol?.endsWith('.KQ')
-      ) || best;
+      best = data.quotes.find(qt => qt.symbol?.endsWith('.KS') || qt.symbol?.endsWith('.KQ')) || best;
     }
 
     const rawSymbol = best.symbol || "";
-
     codeEl.value = rawSymbol.replace(/\.KS|\.KQ$/, '');
 
     if (!/\.KS$|\.KQ$/.test(rawSymbol)) {
-      nameEl.value =
-        best.shortname ||
-        best.longname ||
-        q;
+      nameEl.value = best.shortname || best.longname || qRaw;
     }
 
   } catch {
     alert("종목 조회 실패");
   }
 }
-
 
 
 async function fetchQuote(ticker) {
