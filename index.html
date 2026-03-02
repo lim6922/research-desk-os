@@ -5,7 +5,7 @@
 
 <head>
 <meta charset="UTF-8" />
-<title>Research Desk v260223 (Executive Link-First)</title>
+<title>Research Desk v260302 (Executive Link-First)</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 
@@ -4369,6 +4369,27 @@ async function rdRefreshCloudStatus() {
   }
 }
 
+
+function rdCleanRedirectUrl() {
+  // 쿼리/해시 제거한 현재 페이지 URL (GitHub Pages에서 가장 안정적)
+  return window.location.origin + window.location.pathname;
+}
+
+async function rdCleanupUrlIfAuthCallback() {
+  // OAuth callback로 붙는 code/state 같은 파라미터가 남아있으면 제거
+  const hasAuthParams =
+    /[?&](code|state)=/i.test(window.location.search) ||
+    /[#&](access_token|refresh_token|provider_token)=/i.test(window.location.hash);
+
+  if (hasAuthParams) {
+    history.replaceState({}, document.title, rdCleanRedirectUrl());
+  }
+}
+
+// 페이지 로드 시
+rdCleanupUrlIfAuthCallback();
+rdRefreshCloudStatus();
+
 async function rdSignIn() {
   // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
   const { error } = await sb.auth.signInWithOAuth({
@@ -4381,9 +4402,14 @@ async function rdSignIn() {
 }
 
 async function rdSignOut() {
-  const { error } = await sb.auth.signOut(); // v2 signOut 흐름 :contentReference[oaicite:3]{index=3}
+  const { error } = await sb.auth.signOut();
   if (error) alert("로그아웃 실패: " + error.message);
-  await rdRefreshCloudStatus();
+
+  // 혹시 남아있는 쿼리/해시 제거
+  history.replaceState({}, document.title, rdCleanRedirectUrl());
+
+  // 제일 확실: 새로고침으로 auth 관련 메모리 상태 초기화
+  location.reload();
 }
 
 async function rdCloudPush() {
