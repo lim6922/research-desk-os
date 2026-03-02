@@ -4347,7 +4347,7 @@ function collapseTreeToActive(){
 /*******************************
  * Supabase Cloud Sync (v1)
  *******************************/
-const APP_BASE_URL = "https://lim6922.github.io/research-desk-os/";
+const APP_BASE_URL = window.location.origin + window.location.pathname;
 const SUPABASE_URL = "https://cczjumhjtugdhgkmvdyq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemp1bWhqdHVnZGhna212ZHlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzgzNTMsImV4cCI6MjA4ODAxNDM1M30.tDQXuzzu5o9P-DoEA96q_Uz_Bf8prEtaCAxmoRaoQg8";
 
@@ -4382,19 +4382,17 @@ async function rdRefreshCloudStatus() {
 }
 
 async function rdSignIn() {
+  const redirectTo = window.location.origin + window.location.pathname; // 현재 페이지 정확히
+
   const { error } = await sb.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: APP_BASE_URL,
-      queryParams: {
-        prompt: "select_account"  // ✅ 매번 계정 선택
-        // prompt: "consent"       // ✅ 매번 동의(더 강함)
-      }
+      redirectTo,
+      queryParams: { prompt: "select_account" }
     }
   });
   if (error) alert("로그인 실패: " + error.message);
 }
-
 
 async function rdSignOut() {
   try {
@@ -4407,6 +4405,9 @@ async function rdSignOut() {
   // ✅ 세션 잔여/URL 오염 방지: canonical로 이동
   window.location.href = APP_BASE_URL;
 }
+
+
+
 function fmtKST(ts) {
   if (!ts) return "-";
   const d = new Date(Number(ts));
@@ -4499,18 +4500,29 @@ sb.auth.onAuthStateChange((_event, _session) => {
 });
 rdRefreshCloudStatus();
 
-function rdCleanOauthUrlIfNeeded() {
-  const hasHashToken = window.location.hash && window.location.hash.includes("access_token=");
+async function rdCleanOauthUrlIfNeeded() {
   const hasCodeParam = new URLSearchParams(window.location.search).has("code");
   const hasErrorParam = new URLSearchParams(window.location.search).has("error");
 
-  if (hasHashToken || hasCodeParam || hasErrorParam) {
-    // ✅ canonical로 강제 + 해시/쿼리 제거
+  // 에러면 바로 정리(선택)
+  if (hasErrorParam) {
     history.replaceState(null, "", APP_BASE_URL);
+    return;
+  }
+
+  // code가 있으면: 세션 교환이 끝난 뒤에만 정리
+  if (hasCodeParam) {
+    // supabase가 code -> session 교환할 시간을 줌
+    const { data: { session } } = await sb.auth.getSession();
+
+    // 세션이 생겼으면 그때 URL 정리
+    if (session) {
+      history.replaceState(null, "", APP_BASE_URL);
+    }
   }
 }
 
-// 앱 초기화 시점(맨 아래쪽)에서 1회 호출
+// ✅ 여기 호출은 유지하되, 위처럼 "세션 확인 후" 지우게 변경
 rdCleanOauthUrlIfNeeded();
 
 
