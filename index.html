@@ -673,7 +673,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
   <div class="header-right">
     <div id="cloudFloat" aria-label="cloud sync bar">
       <span id="cloudFloatStatus">☁️ local</span>
-      <a href="#" onclick="rdSignIn(event)">로그인</a>
+      <a href="javascript:void(0)" onclick="rdSignIn()">로그인</a>
       <a class="secondary" href="javascript:void(0)" onclick="rdCloudPull()">불러오기</a>
       <a class="secondary" href="javascript:void(0)" onclick="rdCloudPush()">업로드</a>
       <a class="secondary" href="javascript:void(0)" onclick="rdSignOut()">로그아웃</a>
@@ -4369,69 +4369,32 @@ async function rdRefreshCloudStatus() {
   }
 }
 
-async function rdSignIn(e) {
-  try {
-    // (a 태그 클릭이라면) 기본 동작 차단
-    if (e?.preventDefault) e.preventDefault();
-
-    const redirectTo = rdCleanRedirectUrl();
-
-    const { data, error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        skipBrowserRedirect: true, // ✅ URL만 받고
-      }
-    });
-
-    if (error) return alert("로그인 실패: " + error.message);
-    if (!data?.url) return alert("로그인 URL을 받지 못했습니다.");
-
-    // ✅ 팝업/새창 없이, 현재 탭에서 강제 이동
-    window.location.assign(data.url);
-
-  } catch (err) {
-    console.error(err);
-    alert("로그인 예외: " + (err?.message || err));
-  }
+async function rdSignIn() {
+  // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.href
+    }
+  });
+  if (error) alert("로그인 실패: " + error.message);
 }
-
-
 
 async function rdSignOut() {
-  const ok = confirm("로그아웃 하시겠습니까?");
-  if (!ok) return;
-
-  const { error } = await sb.auth.signOut();
+  const { error } = await sb.auth.signOut(); // v2 signOut 흐름 :contentReference[oaicite:3]{index=3}
   if (error) alert("로그아웃 실패: " + error.message);
-
-  // hash/query 제거해서 주소 꼬임 방지
-  history.replaceState(null, "", window.location.pathname);
-
   await rdRefreshCloudStatus();
 }
-
-
-
 
 async function rdCloudPush() {
   const user = await rdGetUser();
   if (!user) return alert("먼저 로그인하세요.");
 
-  const localVer = Number(getLocalDataLastTs() || 0);
-  const localHuman = localVer ? fmtDateTime(localVer) : "-";
-
-  const ok = confirm(
-    "☁️ 업로드(클라우드 덮어쓰기) 하시겠습니까?\n\n" +
-    `Local DB 버전:\n${localHuman}\n\n` +
-    "진행하면 클라우드가 이 스냅샷으로 갱신됩니다."
-  );
-  if (!ok) return;
-
+  // 로컬 전체 DB를 스냅샷으로 업로드
   const payload = {
     user_id: user.id,
     data: db,
-    data_version: localVer,
+    data_version: Number(getLocalDataLastTs() || 0),
     updated_at: new Date().toISOString()
   };
 
@@ -4441,13 +4404,13 @@ async function rdCloudPush() {
 
   if (error) return alert("업로드 실패: " + error.message);
 
+  // UX: import/export ts처럼 meta도 갱신해주면 직관적
   db.meta.lastExportAt = payload.data_version;
   persist();
   updateSyncStatus();
 
   alert("☁️ 업로드 완료");
 }
-
 
 async function rdCloudPull() {
   const user = await rdGetUser();
@@ -4465,22 +4428,27 @@ async function rdCloudPull() {
   const localVer = Number(getLocalDataLastTs() || 0);
   const remoteVer = Number(data.data_version || 0);
 
-  const localHuman = localVer ? fmtDateTime(localVer) : "-";
-  const remoteHuman = remoteVer ? fmtDateTime(remoteVer) : "-";
+  // 충돌/역전 방지(당신이 이미 만들어 둔 syncSentinel 로직과 방향 동일)
+  if (remoteVer < localVer) {
+    const ok = confirm(
+      "⚠️ 클라우드 데이터가 로컬보다 오래됐습니다.\n\n" +
+      `Local: ${localVer}\nCloud: ${remoteVer}\n\n` +
+      "그래도 클라우드 데이터로 덮어쓸까요?"
+    );
+    if (!ok) return;
+  } else {
+    const ok = confirm(
+      "클라우드 데이터를 불러와 로컬을 덮어씁니다.\n\n" +
+      `Local: ${localVer}\nCloud: ${remoteVer}\n\n진행할까요?`
+    );
+    if (!ok) return;
+  }
 
-  const msg =
-    (remoteVer < localVer)
-      ? ("⚠️ 클라우드 데이터가 로컬보다 오래됐습니다.\n\n" +
-         `Local:\n${localHuman}\n\nCloud:\n${remoteHuman}\n\n` +
-         "그래도 클라우드 데이터로 덮어쓸까요?")
-      : ("클라우드 데이터를 불러와 로컬을 덮어씁니다.\n\n" +
-         `Local:\n${localHuman}\n\nCloud:\n${remoteHuman}\n\n진행할까요?`);
-
-  if (!confirm(msg)) return;
-
+  // ✅ 로컬에 반영
   db = data.data;
   if (!db.meta) db.meta = { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 };
 
+  // 불러온 “버전”을 meta에 주입 (당신이 importData에서 했던 방식과 동일)
   db.meta.lastImportAt = remoteVer;
   db.meta.lastExportAt = remoteVer;
 
@@ -4492,29 +4460,12 @@ async function rdCloudPull() {
 
   alert("☁️ 불러오기 완료");
 }
+
 // 페이지 로드/리다이렉트 복귀 시 상태 반영
 sb.auth.onAuthStateChange((_event, _session) => {
   rdRefreshCloudStatus();
-  rdStripHashSafe();
 });
-
 rdRefreshCloudStatus();
-rdStripHashSafe();
-
-async function rdStripHashSafe() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    history.replaceState(null, document.title, window.location.pathname);
-  }
-}
-
-function rdCleanRedirectUrl() {
-  // GitHub Pages: https://lim6922.github.io/research-desk-os/
-  const u = new URL(window.location.href);
-  u.hash = "";
-  u.search = "";
-  return u.toString();
-}
 
 
 
