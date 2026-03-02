@@ -4370,16 +4370,37 @@ async function rdRefreshCloudStatus() {
 }
 
 async function rdSignIn() {
-  // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
-  const { error } = await sb.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: window.location.href
-    }
-  });
-  if (error) alert("로그인 실패: " + error.message);
-}
+  try {
+    const redirectTo = rdCleanRedirectUrl();
+    console.log("SignIn clicked", redirectTo);
 
+    // ✅ 우리가 직접 이동할 거라서 redirect는 스킵
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true
+      }
+    });
+
+    if (error) {
+      alert("로그인 실패: " + error.message);
+      return;
+    }
+
+    if (!data?.url) {
+      alert("로그인 URL 생성 실패 (data.url 없음)");
+      return;
+    }
+
+    // ✅ 여기서 확실히 이동
+    window.location.assign(data.url);
+
+  } catch (e) {
+    console.error(e);
+    alert("로그인 예외: " + (e?.message || e));
+  }
+}
 async function rdSignOut() {
   const { error } = await sb.auth.signOut(); // v2 signOut 흐름 :contentReference[oaicite:3]{index=3}
   if (error) alert("로그아웃 실패: " + error.message);
