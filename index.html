@@ -4391,15 +4391,18 @@ rdCleanupUrlIfAuthCallback();
 rdRefreshCloudStatus();
 
 async function rdSignIn() {
-  // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
+  console.log("SignIn clicked", rdCleanRedirectUrl());
   const { error } = await sb.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.href
+      redirectTo: rdCleanRedirectUrl()   // ✅ 여기만 바꿔주세요
     }
   });
   if (error) alert("로그인 실패: " + error.message);
 }
+
+
+
 
 async function rdSignOut() {
   const { error } = await sb.auth.signOut();
@@ -4491,7 +4494,7 @@ async function rdCloudPull() {
 sb.auth.onAuthStateChange((_event, _session) => {
   rdRefreshCloudStatus();
 });
-rdRefreshCloudStatus();
+
 
 
 
