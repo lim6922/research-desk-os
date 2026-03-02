@@ -8689,10 +8689,10 @@ function collapseTreeToActive(){
 
 
 /************************************************-----------
- * Supabase Cloud Sync (v260302 - Gatekeeper)
+ * Supabase Cloud Sync (v260302 - Final Fix)
  *************************************************----------*/
 
-// 1. [최상단 배치] 타임스탬프 변환 함수 (ReferenceError 방지)
+/** 1. [도움함수] 타임스탬프를 KST 문자열로 변환 (최상단 배치) */
 function fmtKST(ts) {
   if (!ts || ts === 0) return "-";
   try {
@@ -8703,16 +8703,19 @@ function fmtKST(ts) {
       hour: "2-digit", minute: "2-digit", second: "2-digit",
       hour12: false
     });
-  } catch(e) { return "-"; }
+  } catch(e) { 
+    return "-"; 
+  }
 }
 
+/** 2. Supabase 초기화 */
 const APP_BASE_URL = window.location.origin + window.location.pathname;
 const SUPABASE_URL = "https://cczjumhjtugdhgkmvdyq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemp1bWhqdHVnZGhna212ZHlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzgzNTMsImV4cCI6MjA4ODAxNDM1M30.tDQXuzzu5o9P-DoEA96q_Uz_Bf8prEtaCAxmoRaoQg8";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/** [핵심] 강제 초기화 및 로그아웃 (보안용) */
+/** 3. [보안] 강제 초기화 및 로그아웃 함수 */
 async function rdForceLogout() {
   // 로컬 데이터 즉시 파괴
   db = {
@@ -8725,11 +8728,11 @@ async function rdForceLogout() {
   // Supabase 세션 종료
   await sb.auth.signOut();
   
-  // 페이지 초기화
+  // 페이지 새로고침하여 초기 상태로 복구
   window.location.href = APP_BASE_URL;
 }
 
-/** [핵심] 허용된 사용자인지 DB 조회 (게이트키퍼) */
+/** 4. [게이트키퍼] 화이트리스트 계정 확인 함수 */
 async function rdVerifyAccess(user) {
   try {
     // allowed_users 테이블에서 이메일 존재 여부 확인
@@ -8742,7 +8745,7 @@ async function rdVerifyAccess(user) {
     if (error) throw error;
 
     if (!data) {
-      alert(`❌ 접근 거부: [${user.email}]은 등록되지 않은 계정입니다.\n관리자 승인이 필요합니다.`);
+      alert(`❌ 접근 거부: [${user.email}]은 등록되지 않은 계정입니다.\n관리자에게 승인을 요청하세요.`);
       await rdForceLogout();
       return false;
     }
@@ -8753,7 +8756,7 @@ async function rdVerifyAccess(user) {
   }
 }
 
-/** 클라우드 상태 표시 바 업데이트 */
+/** 5. 클라우드 상태 표시 바 업데이트 */
 function rdRefreshCloudStatus(user) {
   const el = document.getElementById("cloudFloatStatus");
   if (!el) return;
@@ -8767,7 +8770,7 @@ function rdRefreshCloudStatus(user) {
   }
 }
 
-// 2. 로그인 상태 변경 감지
+/** 6. 로그인 상태 변경 감지 이벤트 */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     const isAllowed = await rdVerifyAccess(session.user);
@@ -8777,7 +8780,8 @@ sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-/** 로그인 실행 */
+/** 7. 서비스 함수들 (로그인, 로그아웃, 업로드, 불러오기) */
+
 async function rdSignIn() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: "google",
@@ -8789,19 +8793,16 @@ async function rdSignIn() {
   if (error) alert("로그인 실패: " + error.message);
 }
 
-/** 로그아웃 버튼 (사용자용) */
 async function rdSignOut() {
-  if (!confirm("로그아웃 하시겠습니까?\n로그아웃 시 로컬 데이터는 모두 삭제됩니다.")) return;
+  if (!confirm("로그아웃 하시겠습니까?\n로그아웃 시 현재 브라우저의 데이터는 모두 초기화(삭제)됩니다.")) return;
   await rdForceLogout();
 }
 
-/** 현재 사용자 정보 */
 async function rdGetUser() {
   const { data: { user } } = await sb.auth.getUser();
   return user || null;
 }
 
-/** 클라우드 업로드 (Push) */
 async function rdCloudPush() {
   const user = await rdGetUser();
   if (!user) return alert("먼저 로그인하세요.");
@@ -8814,7 +8815,8 @@ async function rdCloudPush() {
     updated_at: new Date().toISOString()
   };
 
-  if (!confirm(`☁️ 업로드(클라우드 덮어쓰기)\n로컬 기준시각: ${fmtKST(dataVer)}\n진행할까요?`)) return;
+  const ok = confirm(`☁️ 업로드(클라우드 덮어쓰기)\n로컬 데이터 시점: ${fmtKST(dataVer)}\n진행할까요?`);
+  if (!ok) return;
 
   const { error } = await sb.from("rd_snapshots").upsert(payload, { onConflict: "user_id" });
   
@@ -8831,10 +8833,9 @@ async function rdCloudPush() {
   db.meta.lastExportAt = dataVer;
   persist();
   updateSyncStatus();
-  alert("☁️ 업로드 완료\n기준: " + fmtKST(dataVer));
+  alert("☁️ 업로드 완료\n시점: " + fmtKST(dataVer));
 }
 
-/** 클라우드 불러오기 (Pull) */
 async function rdCloudPull() {
   const user = await rdGetUser();
   if (!user) return alert("먼저 로그인하세요.");
@@ -8847,7 +8848,7 @@ async function rdCloudPull() {
 
   if (error) {
     if (error.message.includes("row-level security")) {
-      alert("❌ 접근 권한이 없습니다.");
+      alert("❌ 데이터 접근 권한이 없습니다.");
       await rdForceLogout();
     } else {
       alert("불러오기 실패: " + error.message);
@@ -8858,7 +8859,7 @@ async function rdCloudPull() {
   if (!data) return alert("클라우드에 저장된 데이터가 없습니다.");
 
   const remoteVer = Number(data.data_version || 0);
-  const msg = `☁️ 클라우드 데이터로 덮어쓸까요?\nCloud: ${fmtKST(remoteVer)}`;
+  const msg = `☁️ 클라우드 데이터를 불러올까요?\n(로컬 데이터가 삭제됩니다)\n\nCloud 데이터 시점: ${fmtKST(remoteVer)}`;
 
   if (!confirm(msg)) return;
 
@@ -8874,10 +8875,10 @@ async function rdCloudPull() {
   renderReportList?.();
   updateReportEditorState?.();
 
-  alert("☁️ 불러오기 완료\n기준: " + fmtKST(remoteVer));
+  alert("☁️ 불러오기 완료\n시점: " + fmtKST(remoteVer));
 }
 
-/** URL 정리 */
+/** 8. 초기화 실행 */
 async function rdCleanOauthUrlIfNeeded() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has("code") || urlParams.has("error")) {
@@ -8886,10 +8887,7 @@ async function rdCleanOauthUrlIfNeeded() {
   }
 }
 
-// 초기 실행
 rdCleanOauthUrlIfNeeded();
-
-
 
 
 </script>
