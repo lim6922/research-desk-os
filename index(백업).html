@@ -1,138 +1,22 @@
 <!DOCTYPE html>
 <html lang="ko">
-
-
-
 <head>
 <meta charset="UTF-8" />
 <title>Research Desk v260223 (Executive Link-First)</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-
-
 :root{
   --bg:#f1f5f9; --panel:#ffffff; --line:#cbd5e1; --text:#0f172a;
   --muted:#64748b; --accent:#2563eb; --accent-light:#dbeafe;
   --danger:#ef4444; --warning:#f59e0b; --success:#10b981; --white:#ffffff;
-  --container-max: 1400px;
-  --container-pad: 20px;
-
-  /* container의 "실제 오른쪽 끝" (viewport 기준) */
-  --container-right: calc((100vw - min(100vw, var(--container-max))) / 2 + var(--container-pad));
-
-  /* header-actions 실제 폭(원하는 값으로 조절 가능) */
-  --actions-w: 640px;
 }
 *{box-sizing:border-box; font-family:"Pretendard",-apple-system,sans-serif;}
 body{margin:0; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5;}
-
-
-
 .container{max-width:1400px; margin:0 auto; padding:20px;}
-
-
-
-
-/* ===== Header layout tweak: cloud stays top-right, boxes align ===== */
-.header{
-  position: relative;              /* ✅ cloud absolute 기준점 */
-  display:grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, var(--actions-w));
-  gap:16px;
-  align-items:center;               /* ✅ 좌/우 상단 정렬 */
-  margin-bottom:20px;
-  border-bottom:1px solid var(--line);
-  padding-bottom:15px;
-  padding-top: 14px;               /* ✅ cloud가 위에 떠도 겹치지 않게 공간 확보 */
-}
-
-/* LEFT: title + sync를 위쪽 기준으로 */
-/* ✅ LEFT: title + sync 정렬 안정화 */
-.header-left{
-  display:flex;
-  align-items:center;   /* 🔥 핵심: 위쪽 정렬 -> 가운데 정렬 */
-  gap:16px;
-  min-width:0;
-}
-
-.brand-title{
-  margin:0;
-  color:var(--accent);
-  font-size:30px;
-  line-height:1;        /* 🔥 baseline 흔들림 방지 */
-  white-space:nowrap;
-  padding-top:0;        /* ❌ 기존 10px 제거 */
-}
-
-
-/* ✅ 우측 박스는 내용에 맞게, 대신 너무 커지지 않게만 */
-.header-right{
-  width: auto;
-  max-width: var(--actions-w);
-  justify-self: end;   /* 오른쪽 끝 정렬 */
-  min-width: 0;
-}
-
-/* ✅ cloud: 고정 + 폭은 유지, 박스는 제거 */
-#cloudFloat{
-  position: fixed;
-  top: 10px;
-  right: var(--container-right);
-  width: var(--actions-w);
-  z-index: 20000;
-
-  display:flex;
-  justify-content:flex-end;
-  align-items:center;
-  gap:10px;
-
-  font-size:11px;
-  color:var(--muted);
-  white-space:nowrap;
-
-  /* ❌ 박스 제거 */
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-
-
-/* ✅ 우측 버튼 박스: sync 보드와 "상단 라인" 맞추기 */
-.header-actions{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  gap:10px;
-  align-items:center;
-
-  padding:8px 10px;               /* ✅ sync 보드 높이/패딩과 맞추기 */
-  border-radius:12px;
-  border:1px solid var(--line);
-  background:rgba(255,255,255,0.6);
-  backdrop-filter: blur(6px);
-
-  margin-top: 0;                    /* ✅ sync 보드와 같은 top */
-  min-height: 56px;                 /* 필요시 72/80으로 미세조정 */
-
-  width: fit-content;  /* 🔥 박스가 버튼만큼만 차지 */
-  max-width: 100%;
-}
-
-
-
-
-.sync-monitor{display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start; background:#e2e8f0; padding:4px 10px; border-radius:10px; transition:.2s; max-width:100%; min-width:0;   min-height: 30px;}
-
-
-
-.sync-item {  font-size: 11px;  display: flex;  flex-direction: column;  justify-content: center;   /* 🔑 */  gap: 2px;  color: var(--muted);  min-width: 86px;  min-height: 30px; padding: 4px 0;}
-.sync-item b{ font-size:10px; opacity:.9; }
-.sync-item span{ font-size:11px; line-height:1.1; }
-
-
+.header{display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--line); padding-bottom:15px;}
+.sync-monitor{display:flex; gap:15px; align-items:flex-start; background:#e2e8f0; padding:8px 15px; border-radius:12px; transition:.2s;}
+.sync-item {  font-size: 11px;  display: flex;  flex-direction: column;  justify-content: center;   /* 🔑 */  gap: 2px;  color: var(--muted);  min-width: 95px;  min-height: 34px; padding: 6px 0;}
+.sync-item b{font-size:9px;line-height: 1;}
+.sync-item span {  font-family: monospace;  font-weight: 800;  color: var(--text);  line-height: 1.05;   /* 🔧 줄간격 줄이기 */  white-space: pre-line;}
 .sync-warn { background: #ffedd5 !important; border: 2px solid var(--warning) !important; }
 .sync-warn span { color: var(--warning) !important; }
 
@@ -162,32 +46,7 @@ body{margin:0; background:var(--bg); color:var(--text); font-size:14px; line-hei
 .main-layout{display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:start;}
 .sidebar{position:sticky; top:20px;}
 .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; box-shadow:0 4px 6px -1px rgba(0,0,0,.05); margin-bottom:15px;}
-
-
-
-.meta-row{
-  display:grid;
-  gap:10px;
-  margin-bottom:15px;
-  align-items:end;
-
-  /* ✅ 자동 반응형: 화면 넓으면 여러 칸, 좁으면 한 칸씩 */
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
-
-/* 코드 조회 버튼도 그리드 셀 안에서 자연스럽게 */
-#lookupBtn{
-  width:100%;
-  height:100%;
-  min-height:42px;
-}
-
-/* 더 좁아지면(모바일급) 1열 확정 */
-@media (max-width: 520px){
-  .meta-row{ grid-template-columns: 1fr; }
-}
-
-
+.meta-row{display:grid; grid-template-columns:1.2fr .8fr 115px 1fr 1fr 1fr; gap:10px; margin-bottom:15px; align-items:flex-end;}
 label{display:block; font-size:11px; font-weight:900; color:var(--muted); margin-bottom:4px; text-transform:uppercase;}
 input,textarea,select{  width:100%;  padding:10px;  border:1px solid var(--line);  border-radius:8px;  outline:none;  font-size:16px; /* iOS 필수 */  background:#f8fafc;}
 textarea{resize:vertical;}
@@ -281,22 +140,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
 .hidden{display:none;}
 @media (max-width: 1024px) {  .main-layout {    grid-template-columns: 1fr;  }  .sidebar {    position: static;  }}
 .file-btn:hover {  background: rgba(16,185,129,0.1);  color: var(--success);  border-color: var(--success);}
-
-/* ✅ 좁은 화면에서는 1열로 쌓기 */
-@media (max-width: 1100px){
-  .header{
-    grid-template-columns: 1fr;  /* 좌/우를 위아래로 */
-  }
-  .header-right{
-    width:100%;
-  }
-  .header-actions{
-    justify-content:flex-start;  /* 모바일에서 버튼이 오른쪽에 몰리지 않게 */
-  }
-}
-
-
-
 /* 캡쳐 보드 파일 버튼 */
 .cap-file-btn {  margin-top: 4px;  align-self: flex-start;  font-size: 12px;  border-style: dashed;  opacity: 0.85;}
 .cap-file-btn:hover {  background: rgba(37,99,235,0.08);  color: var(--accent);  border-color: var(--accent);  opacity: 1;}
@@ -611,89 +454,39 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
 }
 
 
-
-
-
-#cloudFloatStatus{
-  font-family: monospace;
-  font-weight: 900;
-  color: var(--text);
-  opacity: .85;
-  padding:1px 6px;
-  border:1px solid var(--line);
-  border-radius:999px;
-  background:rgba(255,255,255,0.6);
-}
-
-#cloudFloat a{
-  color: var(--accent);
-  text-decoration:none;
-  font-weight:800;
-}
-
-#cloudFloat a.secondary{ font-weight:700; opacity:.85; }
-#cloudFloat a:hover{ text-decoration:underline; }
-#cloudFloat a:active{ opacity:.6; }
-
-
-
-/* 트리 리스트 숨김 상태 */
-.tree-collapsed #treeList{
-  display:none;
-}
-
-/* (선택) 접힌 상태에서 패널 높이 줄이기 */
-.tree-collapsed{
-  padding-bottom:10px;
-}
-
-
 </style>
 </head>
 <body>
 
 <div class="container">
-
-
-
-<div class="header">
-  <!-- ✅ LEFT -->
-  <div class="header-left">
-    <h2 class="brand-title">👑 Research Desk</h2>
-
-    <div id="syncSentinel" class="sync-monitor">
-      <div class="sync-item"><b>Local DB</b> <span id="localLastTs">-</span></div>
-      <div class="sync-item"><b>Import</b> <span id="importLastTs">-</span></div>
-      <div class="sync-item"><b>Export</b> <span id="exportLastTs">-</span></div>
-      <div class="sync-item"><b>Quote Sync</b> <span id="quoteLastTs">-</span></div>
+  <div class="header">
+    <div style="display:flex; align-items:center; gap:20px;">
+      <h2 style="margin:0; color:var(--accent); font-size:22px;">👑 Research Desk</h2>
+      <div id="syncSentinel" class="sync-monitor">
+        <div class="sync-item"><b>Local DB</b> <span id="localLastTs">-</span></div>
+        <div class="sync-item"><b>Import</b> <span id="importLastTs">-</span></div>
+        <div class="sync-item"><b>Export</b> <span id="exportLastTs">-</span></div>
+        <div class="sync-item"><b>Quote Sync</b> <span id="quoteLastTs">-</span></div>
+      </div>
     </div>
-  </div>
-
-  <!-- ✅ RIGHT -->
-  <div class="header-right">
-    <div id="cloudFloat" aria-label="cloud sync bar">
-      <span id="cloudFloatStatus">☁️ local</span>
-      <a href="javascript:void(0)" onclick="rdSignIn()">로그인</a>
-      <a class="secondary" href="javascript:void(0)" onclick="rdCloudPull()">불러오기</a>
-      <a class="secondary" href="javascript:void(0)" onclick="rdCloudPush()">업로드</a>
-      <a class="secondary" href="javascript:void(0)" onclick="rdSignOut()">로그아웃</a>
-    </div>
-
-    <div class="header-actions">
+    <div style="
+  background:rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+  border:1px solid var(--line);
+  padding:8px;
+  border-radius:8px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
+  align-items:flex-start;
+">
       <button class="btn btn-ghost" onclick="toggleModal('helpModal')">❔ 가이드</button>
       <button class="btn btn-primary" onclick="exportData()">📤 내보내기</button>
-      <label class="btn btn-ghost" style="margin:0; cursor:pointer;">
-        📥 가져오기 <input type="file" hidden onchange="importData(event)">
-      </label>
+      <label class="btn btn-ghost" style="margin:0; cursor:pointer;"> 📥 가져오기 <input type="file" hidden onchange="importData(event)"></label>
       <button class="btn btn-ghost" style="color:var(--danger)" onclick="resetAll()">⚠️ 초기화</button>
       <button class="btn btn-ghost" onclick="syncQuotes()">📊 전체 시세 동기화</button>
     </div>
   </div>
-</div>
-
-
-
-
 
   <div class="nav-tabs">
     <button onclick="switchTab('monitor')" id="tab-monitor">📅 일정 투자 모니터링</button>
@@ -801,14 +594,6 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
        placeholder="종목 / 섹터 / 태그 / 내용 검색"
        style="margin-bottom:10px;"
        oninput="handleDeskSearch(this.value)">
-<div style="display:flex; gap:8px; margin-bottom:10px;">
-  <button class="btn btn-ghost btn-mini" onclick="toggleTreeList()">
-    📁 목록 숨기기/보이기
-  </button>
-  <button class="btn btn-ghost btn-mini" onclick="collapseTreeToActive()">
-    🎯 선택 종목만
-  </button>
-</div>
           <div id="treeList"></div>
         </div>
       </div>
@@ -4302,172 +4087,6 @@ function openImgById(entryId, idx) {
     openImg(imgData.src, imgData.note || "", idx, entryId);
   }
 }
-
-
-function toggleTreeList(){
-  const panel = document.querySelector('.sidebar .panel');
-  if (!panel) return;
-  panel.classList.toggle('tree-collapsed');
-}
-
-/* 선택된 종목만 보이게(= ALL 제외, active만) */
-function collapseTreeToActive(){
-  // "ALL"이면 그냥 토글처럼 동작
-  if (selectedTicker === "ALL") {
-    toggleTreeList();
-    return;
-  }
-
-  // treeList를 “선택된 종목 + 전체보기”만 남기도록 렌더링
-  const counts = db.entries.reduce((acc, e) => {
-    const code = e.tickerCode;
-    if (!acc[code]) acc[code] = { name: e.tickerName, count: 0 };
-    acc[code].count++;
-    return acc;
-  }, {});
-
-  const list = document.getElementById('treeList');
-  if (!list) return;
-
-  const active = counts[selectedTicker];
-  let html = `<div class="tree-item" onclick="selectTree('ALL')"><span>전체보기</span><span>${db.entries.length}</span></div>`;
-
-  if (active) {
-    html += `<div class="tree-item active" onclick="selectTree('${selectedTicker}')">
-               <span>${active.name}</span><small>${active.count}</small>
-             </div>`;
-  }
-
-  list.innerHTML = html;
-}
-
-
-
-
-/*******************************
- * Supabase Cloud Sync (v1)
- *******************************/
-const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // v2 createClient :contentReference[oaicite:2]{index=2}
-
-async function rdGetUser() {
-  const { data: { user } } = await sb.auth.getUser();
-  return user || null;
-}
-
-async function rdRefreshCloudStatus() {
-  const user = await rdGetUser();
-  const el = document.getElementById("cloudFloatStatus");
-  if (!el) return;
-
-  if (user) {
-    const short = (user.email || user.id || "").toString();
-    el.textContent = `☁️ cloud · ${short.length > 22 ? short.slice(0,22) + "…" : short}`;
-  } else {
-    el.textContent = "☁️ local";
-  }
-}
-
-async function rdSignIn() {
-  // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
-  const { error } = await sb.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: window.location.href
-    }
-  });
-  if (error) alert("로그인 실패: " + error.message);
-}
-
-async function rdSignOut() {
-  const { error } = await sb.auth.signOut(); // v2 signOut 흐름 :contentReference[oaicite:3]{index=3}
-  if (error) alert("로그아웃 실패: " + error.message);
-  await rdRefreshCloudStatus();
-}
-
-async function rdCloudPush() {
-  const user = await rdGetUser();
-  if (!user) return alert("먼저 로그인하세요.");
-
-  // 로컬 전체 DB를 스냅샷으로 업로드
-  const payload = {
-    user_id: user.id,
-    data: db,
-    data_version: Number(getLocalDataLastTs() || 0),
-    updated_at: new Date().toISOString()
-  };
-
-  const { error } = await sb
-    .from("rd_snapshots")
-    .upsert(payload, { onConflict: "user_id" });
-
-  if (error) return alert("업로드 실패: " + error.message);
-
-  // UX: import/export ts처럼 meta도 갱신해주면 직관적
-  db.meta.lastExportAt = payload.data_version;
-  persist();
-  updateSyncStatus();
-
-  alert("☁️ 업로드 완료");
-}
-
-async function rdCloudPull() {
-  const user = await rdGetUser();
-  if (!user) return alert("먼저 로그인하세요.");
-
-  const { data, error } = await sb
-    .from("rd_snapshots")
-    .select("data, data_version, updated_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error) return alert("불러오기 실패: " + error.message);
-  if (!data) return alert("클라우드에 저장된 데이터가 없습니다.");
-
-  const localVer = Number(getLocalDataLastTs() || 0);
-  const remoteVer = Number(data.data_version || 0);
-
-  // 충돌/역전 방지(당신이 이미 만들어 둔 syncSentinel 로직과 방향 동일)
-  if (remoteVer < localVer) {
-    const ok = confirm(
-      "⚠️ 클라우드 데이터가 로컬보다 오래됐습니다.\n\n" +
-      `Local: ${localVer}\nCloud: ${remoteVer}\n\n` +
-      "그래도 클라우드 데이터로 덮어쓸까요?"
-    );
-    if (!ok) return;
-  } else {
-    const ok = confirm(
-      "클라우드 데이터를 불러와 로컬을 덮어씁니다.\n\n" +
-      `Local: ${localVer}\nCloud: ${remoteVer}\n\n진행할까요?`
-    );
-    if (!ok) return;
-  }
-
-  // ✅ 로컬에 반영
-  db = data.data;
-  if (!db.meta) db.meta = { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 };
-
-  // 불러온 “버전”을 meta에 주입 (당신이 importData에서 했던 방식과 동일)
-  db.meta.lastImportAt = remoteVer;
-  db.meta.lastExportAt = remoteVer;
-
-  persist();
-  renderAll();
-  updateSyncStatus();
-  renderReportList?.();
-  updateReportEditorState?.();
-
-  alert("☁️ 불러오기 완료");
-}
-
-// 페이지 로드/리다이렉트 복귀 시 상태 반영
-sb.auth.onAuthStateChange((_event, _session) => {
-  rdRefreshCloudStatus();
-});
-rdRefreshCloudStatus();
-
-
 
 </script>
 </body>
