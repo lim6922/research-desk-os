@@ -4371,10 +4371,9 @@ async function rdRefreshCloudStatus() {
 
 async function rdSignIn() {
   try {
-    rdStripHash(); // ✅ 혹시 남아있을 hash 제거
-
     const redirectTo = rdCleanRedirectUrl();
 
+    // 1) OAuth URL 생성 (페이지 이동 없이)
     const { data, error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -4392,36 +4391,29 @@ async function rdSignIn() {
       return;
     }
 
-    // ✅ 팝업 열기
+    // 2) 팝업 열기
     const w = 520, h = 720;
-    const left = (screen.width - w) / 2;
-    const top = (screen.height - h) / 2;
+    const left = window.screenX + (window.outerWidth - w) / 2;
+    const top = window.screenY + (window.outerHeight - h) / 2;
+
     const popup = window.open(
       data.url,
-      "rd_google_login",
+      "supabase-google-oauth",
       `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`
     );
 
     if (!popup) {
-      alert("팝업이 차단되었습니다. 브라우저에서 팝업 허용 후 다시 시도해주세요.");
+      alert("팝업이 차단되었습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.");
       return;
     }
 
-    // ✅ 로그인 완료 폴링: 세션 생기면 팝업 닫고 UI 갱신
-    const started = Date.now();
+    // 3) 팝업이 닫힐 때까지 대기 → 세션 갱신
     const timer = setInterval(async () => {
-      const user = await rdGetUser();
-      if (user) {
+      if (popup.closed) {
         clearInterval(timer);
-        try { popup.close(); } catch {}
-        rdStripHash(); // ✅ 로그인 후에도 혹시 생긴 hash 제거
         await rdRefreshCloudStatus();
       }
-      // 2분 타임아웃
-      if (Date.now() - started > 120000) {
-        clearInterval(timer);
-      }
-    }, 600);
+    }, 400);
 
   } catch (e) {
     console.error(e);
@@ -4431,14 +4423,18 @@ async function rdSignIn() {
 
 
 async function rdSignOut() {
-  if (!confirm("로그아웃 하시겠습니까?")) return;
+  const ok = confirm("로그아웃 하시겠습니까?");
+  if (!ok) return;
 
   const { error } = await sb.auth.signOut();
   if (error) alert("로그아웃 실패: " + error.message);
 
-  rdStripHash();                 // ✅ hash 제거
+  // hash/query 제거해서 주소 꼬임 방지
+  history.replaceState(null, "", window.location.pathname);
+
   await rdRefreshCloudStatus();
 }
+
 
 
 
@@ -4535,9 +4531,11 @@ function rdStripHash() {
 }
 
 function rdCleanRedirectUrl() {
-  // redirectTo는 hash 없는 "정확한 파일 경로"로 고정
-  // (search는 유지해도 되지만 보통 없으니 pathname만 써도 OK)
-  return window.location.origin + window.location.pathname;
+  // GitHub Pages: https://lim6922.github.io/research-desk-os/
+  const u = new URL(window.location.href);
+  u.hash = "";
+  u.search = "";
+  return u.toString();
 }
 
 
