@@ -4369,70 +4369,21 @@ async function rdRefreshCloudStatus() {
   }
 }
 
-
-function rdCleanRedirectUrl() {
-  // 쿼리/해시 제거한 현재 페이지 URL (GitHub Pages에서 가장 안정적)
-  return window.location.origin + window.location.pathname;
-}
-
-async function rdCleanupUrlIfAuthCallback() {
-  // OAuth callback로 붙는 code/state 같은 파라미터가 남아있으면 제거
-  const hasAuthParams =
-    /[?&](code|state)=/i.test(window.location.search) ||
-    /[#&](access_token|refresh_token|provider_token)=/i.test(window.location.hash);
-
-  if (hasAuthParams) {
-    history.replaceState({}, document.title, rdCleanRedirectUrl());
-  }
-}
-
-// 페이지 로드 시
-rdCleanupUrlIfAuthCallback();
-rdRefreshCloudStatus();
 async function rdSignIn() {
-  try {
-    const redirectTo = rdCleanRedirectUrl();
-    console.log("SignIn clicked", redirectTo);
-
-    // ✅ 우리가 직접 이동할 거라서 redirect는 스킵
-    const { data, error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        skipBrowserRedirect: true
-      }
-    });
-
-    if (error) {
-      alert("로그인 실패: " + error.message);
-      return;
+  // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.href
     }
-
-    if (!data?.url) {
-      alert("로그인 URL 생성 실패 (data.url 없음)");
-      return;
-    }
-
-    // ✅ 여기서 확실히 이동
-    window.location.assign(data.url);
-
-  } catch (e) {
-    console.error(e);
-    alert("로그인 예외: " + (e?.message || e));
-  }
+  });
+  if (error) alert("로그인 실패: " + error.message);
 }
-
-
 
 async function rdSignOut() {
-  const { error } = await sb.auth.signOut();
+  const { error } = await sb.auth.signOut(); // v2 signOut 흐름 :contentReference[oaicite:3]{index=3}
   if (error) alert("로그아웃 실패: " + error.message);
-
-  // 혹시 남아있는 쿼리/해시 제거
-  history.replaceState({}, document.title, rdCleanRedirectUrl());
-
-  // 제일 확실: 새로고침으로 auth 관련 메모리 상태 초기화
-  location.reload();
+  await rdRefreshCloudStatus();
 }
 
 async function rdCloudPush() {
@@ -4514,7 +4465,7 @@ async function rdCloudPull() {
 sb.auth.onAuthStateChange((_event, _session) => {
   rdRefreshCloudStatus();
 });
-
+rdRefreshCloudStatus();
 
 
 
