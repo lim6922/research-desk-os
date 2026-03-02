@@ -4347,9 +4347,21 @@ function collapseTreeToActive(){
 /*******************************
  * Supabase Cloud Sync (v1)
  *******************************/
+const APP_BASE_URL = "https://lim6922.github.io/research-desk-os/";
 const SUPABASE_URL = "https://cczjumhjtugdhgkmvdyq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemp1bWhqdHVnZGhna212ZHlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzgzNTMsImV4cCI6MjA4ODAxNDM1M30.tDQXuzzu5o9P-DoEA96q_Uz_Bf8prEtaCAxmoRaoQg8";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); // v2 createClient :contentReference[oaicite:2]{index=2}
+
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    flowType: "pkce",
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true
+  }
+});
+
+// v2 createClient :contentReference[oaicite:2]{index=2}
 
 async function rdGetUser() {
   const { data: { user } } = await sb.auth.getUser();
@@ -4370,47 +4382,75 @@ async function rdRefreshCloudStatus() {
 }
 
 async function rdSignIn() {
-  // ✅ Google OAuth 예시 (Supabase Auth > Providers에서 Google 활성화 필요)
   const { error } = await sb.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: window.location.href
+      redirectTo: APP_BASE_URL,
+      queryParams: {
+        prompt: "select_account"  // ✅ 매번 계정 선택
+        // prompt: "consent"       // ✅ 매번 동의(더 강함)
+      }
     }
   });
   if (error) alert("로그인 실패: " + error.message);
 }
 
+
 async function rdSignOut() {
-  const { error } = await sb.auth.signOut(); // v2 signOut 흐름 :contentReference[oaicite:3]{index=3}
-  if (error) alert("로그아웃 실패: " + error.message);
-  await rdRefreshCloudStatus();
+  try {
+    // 가능한 경우: 모든 디바이스 세션 정리
+    await sb.auth.signOut({ scope: "global" });
+  } catch {
+    await sb.auth.signOut();
+  }
+
+  // ✅ 세션 잔여/URL 오염 방지: canonical로 이동
+  window.location.href = APP_BASE_URL;
 }
+function fmtKST(ts) {
+  if (!ts) return "-";
+  const d = new Date(Number(ts));
+  return d.toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false
+  });
+}
+
+
+
 
 async function rdCloudPush() {
   const user = await rdGetUser();
   if (!user) return alert("먼저 로그인하세요.");
 
-  // 로컬 전체 DB를 스냅샷으로 업로드
+  const dataVer = Number(getLocalDataLastTs() || 0);
+
   const payload = {
     user_id: user.id,
     data: db,
-    data_version: Number(getLocalDataLastTs() || 0),
+    data_version: dataVer,
     updated_at: new Date().toISOString()
   };
 
-  const { error } = await sb
-    .from("rd_snapshots")
-    .upsert(payload, { onConflict: "user_id" });
+  const ok = confirm(
+    "☁️ 업로드(클라우드 덮어쓰기)\n\n" +
+    `로컬 데이터 기준시각: ${fmtKST(dataVer)}\n\n진행할까요?`
+  );
+  if (!ok) return;
 
+  const { error } = await sb.from("rd_snapshots").upsert(payload, { onConflict: "user_id" });
   if (error) return alert("업로드 실패: " + error.message);
 
-  // UX: import/export ts처럼 meta도 갱신해주면 직관적
-  db.meta.lastExportAt = payload.data_version;
+  db.meta.lastExportAt = dataVer;
   persist();
   updateSyncStatus();
 
-  alert("☁️ 업로드 완료");
+  alert("☁️ 업로드 완료\n\n" + `업로드 기준시각: ${fmtKST(dataVer)}`);
 }
+
+
 
 async function rdCloudPull() {
   const user = await rdGetUser();
@@ -4427,28 +4467,20 @@ async function rdCloudPull() {
 
   const localVer = Number(getLocalDataLastTs() || 0);
   const remoteVer = Number(data.data_version || 0);
+  const remoteAt = data.updated_at ? new Date(data.updated_at).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-";
 
-  // 충돌/역전 방지(당신이 이미 만들어 둔 syncSentinel 로직과 방향 동일)
-  if (remoteVer < localVer) {
-    const ok = confirm(
-      "⚠️ 클라우드 데이터가 로컬보다 오래됐습니다.\n\n" +
-      `Local: ${localVer}\nCloud: ${remoteVer}\n\n` +
-      "그래도 클라우드 데이터로 덮어쓸까요?"
-    );
-    if (!ok) return;
-  } else {
-    const ok = confirm(
-      "클라우드 데이터를 불러와 로컬을 덮어씁니다.\n\n" +
-      `Local: ${localVer}\nCloud: ${remoteVer}\n\n진행할까요?`
-    );
-    if (!ok) return;
-  }
+  const msg =
+    "☁️ 클라우드 불러오기(로컬 덮어쓰기)\n\n" +
+    `Local : ${fmtKST(localVer)}\n` +
+    `Cloud : ${fmtKST(remoteVer)}\n` +
+    `Cloud 업데이트: ${remoteAt}\n\n` +
+    (remoteVer < localVer ? "⚠️ 클라우드가 로컬보다 오래됐습니다.\n그래도 덮어쓸까요?" : "진행할까요?");
 
-  // ✅ 로컬에 반영
+  if (!confirm(msg)) return;
+
   db = data.data;
   if (!db.meta) db.meta = { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 };
 
-  // 불러온 “버전”을 meta에 주입 (당신이 importData에서 했던 방식과 동일)
   db.meta.lastImportAt = remoteVer;
   db.meta.lastExportAt = remoteVer;
 
@@ -4458,7 +4490,7 @@ async function rdCloudPull() {
   renderReportList?.();
   updateReportEditorState?.();
 
-  alert("☁️ 불러오기 완료");
+  alert("☁️ 불러오기 완료\n\n" + `적용 기준시각: ${fmtKST(remoteVer)}`);
 }
 
 // 페이지 로드/리다이렉트 복귀 시 상태 반영
@@ -4466,6 +4498,20 @@ sb.auth.onAuthStateChange((_event, _session) => {
   rdRefreshCloudStatus();
 });
 rdRefreshCloudStatus();
+
+function rdCleanOauthUrlIfNeeded() {
+  const hasHashToken = window.location.hash && window.location.hash.includes("access_token=");
+  const hasCodeParam = new URLSearchParams(window.location.search).has("code");
+  const hasErrorParam = new URLSearchParams(window.location.search).has("error");
+
+  if (hasHashToken || hasCodeParam || hasErrorParam) {
+    // ✅ canonical로 강제 + 해시/쿼리 제거
+    history.replaceState(null, "", APP_BASE_URL);
+  }
+}
+
+// 앱 초기화 시점(맨 아래쪽)에서 1회 호출
+rdCleanOauthUrlIfNeeded();
 
 
 
