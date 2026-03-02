@@ -4389,18 +4389,38 @@ async function rdCleanupUrlIfAuthCallback() {
 // 페이지 로드 시
 rdCleanupUrlIfAuthCallback();
 rdRefreshCloudStatus();
-
 async function rdSignIn() {
-  console.log("SignIn clicked", rdCleanRedirectUrl());
-  const { error } = await sb.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: rdCleanRedirectUrl()   // ✅ 여기만 바꿔주세요
-    }
-  });
-  if (error) alert("로그인 실패: " + error.message);
-}
+  try {
+    const redirectTo = rdCleanRedirectUrl();
+    console.log("SignIn clicked", redirectTo);
 
+    // ✅ 우리가 직접 이동할 거라서 redirect는 스킵
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true
+      }
+    });
+
+    if (error) {
+      alert("로그인 실패: " + error.message);
+      return;
+    }
+
+    if (!data?.url) {
+      alert("로그인 URL 생성 실패 (data.url 없음)");
+      return;
+    }
+
+    // ✅ 여기서 확실히 이동
+    window.location.assign(data.url);
+
+  } catch (e) {
+    console.error(e);
+    alert("로그인 예외: " + (e?.message || e));
+  }
+}
 
 
 
