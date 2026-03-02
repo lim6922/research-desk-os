@@ -673,7 +673,7 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
   <div class="header-right">
     <div id="cloudFloat" aria-label="cloud sync bar">
       <span id="cloudFloatStatus">☁️ local</span>
-      <a href="javascript:void(0)" onclick="rdSignIn()">로그인</a>
+      <a href="#" onclick="rdSignIn(event)">로그인</a>
       <a class="secondary" href="javascript:void(0)" onclick="rdCloudPull()">불러오기</a>
       <a class="secondary" href="javascript:void(0)" onclick="rdCloudPush()">업로드</a>
       <a class="secondary" href="javascript:void(0)" onclick="rdSignOut()">로그아웃</a>
@@ -4369,25 +4369,35 @@ async function rdRefreshCloudStatus() {
   }
 }
 
-async function rdSignIn() {
+async function rdSignIn(e) {
   try {
-    const redirectTo = rdCleanRedirectUrl(); // 그대로 사용
+    // (a 태그 클릭이라면) 기본 동작 차단
+    if (e?.preventDefault) e.preventDefault();
 
-    const { error } = await sb.auth.signInWithOAuth({
+    const redirectTo = rdCleanRedirectUrl();
+
+    const { data, error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo
+        redirectTo,
+        skipBrowserRedirect: true, // ✅ URL만 받고
       }
     });
 
-    if (error) {
-      alert("로그인 실패: " + error.message);
-    }
-  } catch (e) {
-    console.error(e);
-    alert("로그인 예외: " + (e?.message || e));
+    if (error) return alert("로그인 실패: " + error.message);
+    if (!data?.url) return alert("로그인 URL을 받지 못했습니다.");
+
+    // ✅ 팝업/새창 없이, 현재 탭에서 강제 이동
+    window.location.assign(data.url);
+
+  } catch (err) {
+    console.error(err);
+    alert("로그인 예외: " + (err?.message || err));
   }
 }
+
+
+
 async function rdSignOut() {
   const ok = confirm("로그아웃 하시겠습니까?");
   if (!ok) return;
@@ -4485,14 +4495,16 @@ async function rdCloudPull() {
 // 페이지 로드/리다이렉트 복귀 시 상태 반영
 sb.auth.onAuthStateChange((_event, _session) => {
   rdRefreshCloudStatus();
+  rdStripHashSafe();
 });
-rdStripHash();
-rdRefreshCloudStatus();
 
-function rdStripHash() {
-  // hash(#...)가 있으면 깨끗이 제거 (뒤로가기 기록도 남기지 않음)
-  if (window.location.hash && window.location.hash.length > 0) {
-    history.replaceState(null, document.title, window.location.pathname + window.location.search);
+rdRefreshCloudStatus();
+rdStripHashSafe();
+
+async function rdStripHashSafe() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    history.replaceState(null, document.title, window.location.pathname);
   }
 }
 
