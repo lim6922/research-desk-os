@@ -2,11 +2,12 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>투자 통합 모니터링 대시보드 (v3.5_Full_Edit)</title>
     <style>
         :root { --primary: #004085; --naver: #03cf5d; --google: #4285f4; --bg: #f4f7fa; --scrap: #ffc107; --danger: #e63946; --custom: #6f42c1; }
         * { box-sizing: border-box; }
-        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 12px; height: 100vh; overflow: hidden; }
+         body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 12px; min-height: 100vh; overflow-x: hidden; overflow-y: auto; }
         
         .dashboard-grid { display: grid; grid-template-columns: 320px 340px 340px 1fr; grid-template-rows: 1fr 220px; gap: 12px; height: calc(100vh - 24px); }
         .column { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; }
@@ -73,6 +74,72 @@
         .scrap-card { min-width: 320px; max-width: 320px; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; padding: 12px; position: relative; }
         .scrap-card-title { font-size: 0.82rem; font-weight: bold; line-height: 1.35; margin-bottom: 5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
         .scrap-memo { width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.75rem; background: #fff; outline: none; margin-top: 5px; }
+
+
+        @media (max-width: 1024px) {
+            body { padding: 8px; }
+            .dashboard-grid {
+                display: flex;
+                flex-direction: column;
+                height: auto;
+                gap: 10px;
+            }
+            .column,
+            .card,
+            .scrap-area {
+                height: auto;
+                min-height: 0;
+            }
+            .filter-group,
+            .scroll-area {
+                max-height: 50vh;
+            }
+            .date-filter {
+                flex-wrap: wrap;
+            }
+            #previewFrame {
+                width: 100%;
+                height: 70vh;
+                transform: none;
+                position: static;
+            }
+            .preview-container {
+                overflow: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .card { padding: 12px; }
+            .title {
+                font-size: 0.95rem;
+                flex-wrap: wrap;
+                gap: 6px;
+                line-height: 1.3;
+            }
+            .item-title {
+                font-size: 0.95rem;
+                padding-right: 0;
+            }
+            .item-actions {
+                position: static;
+                margin-bottom: 6px;
+                justify-content: flex-end;
+            }
+            .keyword-row {
+                flex-direction: column;
+            }
+            .btn-admin,
+            .btn-preset,
+            .btn-tool,
+            .btn-action-small {
+                min-height: 36px;
+            }
+            .scrap-card {
+                min-width: 85vw;
+                max-width: 85vw;
+            }
+        }
+
     </style>
 </head>
 <body>
