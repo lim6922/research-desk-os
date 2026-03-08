@@ -5,6 +5,7 @@
 
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Research Desk v260302 (Executive Link-First)</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -519,7 +520,60 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
   color:#065f46;
 }
 
+@media (max-width: 768px){
+  :root{
+    --container-pad: 12px;
+    --actions-w: 100%;
+  }
 
+  body{font-size:15px;}
+  .container{padding:12px;}
+  .panel,
+  .card,
+  .modal-content{padding:14px;}
+
+  .brand-title{font-size:24px; white-space:normal; line-height:1.2;}
+  .header-left{align-items:flex-start; flex-direction:column; gap:10px;}
+  .header-actions{width:100%; justify-content:flex-start;}
+
+  #cloudFloat{
+    position:static;
+    width:100%;
+    justify-content:flex-start;
+    white-space:normal;
+    margin-bottom:8px;
+  }
+
+  .nav-tabs{
+    width:100%;
+    overflow-x:auto;
+    white-space:nowrap;
+  }
+
+  .main-layout,
+  .report-layout,
+  .trade-grid,
+  .capture-grid{
+    grid-template-columns:1fr;
+  }
+
+  .tab-content{height:auto;}
+  .report-sidebar{position:static; height:auto;}
+
+  .card-header{
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .card-header > div:last-child{
+    width:100%;
+    flex-wrap:wrap;
+  }
+
+  .btn{min-height:40px;}
+  .url-card{max-width:100%;}
+}
+  
 /* Explorer 서브 패널 강조 스타일 */
 .panel-highlight {
   border: 2px solid;
