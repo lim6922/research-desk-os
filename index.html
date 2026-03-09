@@ -4536,7 +4536,31 @@ const APP_BASE_URL = window.location.origin + window.location.pathname;
 const SUPABASE_URL = "https://cczjumhjtugdhgkmvdyq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemp1bWhqdHVnZGhna212ZHlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzgzNTMsImV4cCI6MjA4ODAxNDM1M30.tDQXuzzu5o9P-DoEA96q_Uz_Bf8prEtaCAxmoRaoQg8";
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
+
+let rdSessionKeepAliveTimer = null;
+
+function rdStartSessionKeepAlive() {
+  if (rdSessionKeepAliveTimer) return;
+
+  // 로그인 세션이 짧게 끊기지 않도록 30분마다 토큰 갱신 시도
+  rdSessionKeepAliveTimer = setInterval(async () => {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        await sb.auth.refreshSession();
+      }
+    } catch (err) {
+      console.warn("Session keep-alive failed:", err);
+    }
+  }, 30 * 60 * 1000);
+}
 
 /** 3. [보안] 강제 초기화 및 로그아웃 */
 async function rdForceLogout() {
@@ -4596,6 +4620,7 @@ function rdRefreshCloudStatus(user) {
 /** 6. 로그인 상태 변경 감지 이벤트 */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
+    rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     if (isAllowed) rdRefreshCloudStatus(session.user);
   } else {
@@ -4729,6 +4754,15 @@ async function rdCleanOauthUrlIfNeeded() {
 }
 
 rdCleanOauthUrlIfNeeded();
+
+  (async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    rdStartSessionKeepAlive();
+    const isAllowed = await rdVerifyAccess(session.user);
+    rdRefreshCloudStatus(isAllowed ? session.user : null);
+  }
+})();
 
 </script>
 </body>
