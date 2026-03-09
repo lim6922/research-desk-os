@@ -685,6 +685,22 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
   color:var(--accent);
 }
 
+.md-oli { margin:4px 0; }
+.md-oli-no { color:var(--accent); font-weight:800; }
+.md-task { margin:4px 0; display:flex; align-items:center; gap:6px; }
+.md-task input { pointer-events:none; }
+.md-link { color:#1d4ed8; text-decoration:underline; font-weight:700; }
+.md-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background:#e2e8f0;
+  border-radius:4px;
+  padding:1px 4px;
+  font-size:12px;
+}
+.md-table { width:100%; border-collapse:collapse; margin:8px 0; font-size:12px; }
+.md-table th, .md-table td { border:1px solid #cbd5e1; padding:6px 8px; text-align:left; }
+.md-table th { background:#f1f5f9; font-weight:800; }
+
 #reportContainer{
   height: calc(100vh - 180px);
   overflow-y: auto;
@@ -800,6 +816,17 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent); background:v
           <textarea id="content"
           style="height:100px;"
           placeholder="센터장님의 핵심 가설과 관련 URL을 기록하세요..."></textarea>
+                  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','h1')"># 제목</button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','bold')"><b>B</b></button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','italic')"><i>I</i></button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','link')">🔗 링크</button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','code')">⌨️ 코드</button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','quote')">❝ 인용</button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','table')">▦ 표</button>
+            <button type="button" class="btn btn-ghost" style="padding:6px 8px; font-size:11px;" onclick="insertMarkdownSnippet('content','task')">☑ 체크</button>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-top:6px;">Tip: Ctrl+B/I/U/H 단축키로 빠르게 Markdown 서식을 적용할 수 있습니다.</div>
         </div>
         <div>
           <label>무효화 조건 (Risk)</label>
@@ -1223,6 +1250,10 @@ Research Desk는 단순 메모장이 아니라,<br>
 • <b>Ctrl + Alt + M</b> : Monitor 탭 이동<br>
 • <b>Ctrl + Alt + E</b> : Explorer 탭 이동<br>
 • <b>Ctrl + Alt + R</b> : Report 탭 이동<br><br>
+
+<b style="color:var(--text);">🧩 Markdown 에디터</b><br>
+• Desk의 "핵심 가설" 입력창 하단 버튼으로 제목/링크/코드/표/체크리스트 템플릿을 빠르게 삽입할 수 있습니다.<br>
+• 지원 렌더링: 제목, 굵게/기울임, 인용, 구분선, 목록(순서/비순서), 체크리스트, 링크, 인라인 코드<br><br>
 
     <button class="btn btn-primary"
             style="margin-top:20px; width:100%;"
@@ -4299,13 +4330,76 @@ t = t.replace(/(^|[^*])\*(?!\*)(.*?)\*(?!\*)/g,
   t = t.replace(/^---$/gm,
       `<div class="md-hr"></div>`);
 
+    // Markdown 링크
+  t = t.replace(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g,
+      `<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>`);
+
+  // Inline code
+  t = t.replace(/`([^`]+)`/g,
+      `<code class="md-inline-code">$1</code>`);
+
+  // 체크리스트
+  t = t.replace(/^- \[ \] (.*)$/gm,
+      `<div class="md-task"><input type="checkbox" disabled> $1</div>`);
+  t = t.replace(/^- \[x\] (.*)$/gim,
+      `<div class="md-task"><input type="checkbox" checked disabled> $1</div>`);
+
+  // Ordered List
+  t = t.replace(/^(\d+)\. (.*)$/gm,
+      `<div class="md-oli"><span class="md-oli-no">$1.</span> $2</div>`);
+
   // Unordered List
   t = t.replace(/^- (.*)$/gm,
       `<div class="md-li">$1</div>`);
 
+    // Table
+  t = t.replace(/((?:^\|.*\|\s*$\n?){2,})/gm, block => {
+    const lines = block.trim().split(/\n/).map(x => x.trim()).filter(Boolean);
+    if (lines.length < 2) return block;
+    const [headerLine, dividerLine, ...rows] = lines;
+    if (!/^\|?\s*[-:| ]+\|\s*$/.test(dividerLine)) return block;
+
+    const parseCells = (line) => line.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    const headers = parseCells(headerLine);
+    const bodyRows = rows.map(parseCells);
+
+    const thead = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${bodyRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    return `<table class="md-table">${thead}${tbody}</table>`;
+  });
+
   return t;
 }
 
+function insertMarkdownSnippet(targetId, type) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+
+  const start = el.selectionStart ?? el.value.length;
+  const end = el.selectionEnd ?? el.value.length;
+  const selected = el.value.substring(start, end);
+
+  const wrapSelection = (before, after = before) => {
+    const next = before + (selected || "텍스트") + after;
+    el.value = el.value.slice(0, start) + next + el.value.slice(end);
+  };
+
+  if (type === 'h1') wrapSelection('# ', '');
+  if (type === 'bold') wrapSelection('**');
+  if (type === 'italic') wrapSelection('*');
+  if (type === 'link') wrapSelection('[링크 텍스트](', ')');
+  if (type === 'code') wrapSelection('`');
+  if (type === 'quote') wrapSelection('> ', '');
+  if (type === 'task') wrapSelection('- [ ] ', '');
+  if (type === 'table') {
+    const table = `| 헤더1 | 헤더2 | 헤더3 |
+|---|---|---|
+| 값1 | 값2 | 값3 |`;
+    el.value = el.value.slice(0, start) + table + el.value.slice(end);
+  }
+
+  el.focus();
+}
 
 function filterReport() {
 
