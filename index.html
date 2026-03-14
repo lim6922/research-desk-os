@@ -3162,6 +3162,7 @@ document.getElementById('lbNoteInput')
 
 function saveLightboxNote() {
   if (lightboxImageIndex === null) return;
+
   const note = document.getElementById('lbNoteInput').value || "";
 
   if (lightboxMode === "draft") {
@@ -3172,18 +3173,19 @@ function saveLightboxNote() {
   }
 
   if (lightboxMode === "entry" && lightboxEntryId) {
-  const entry = db.entries.find(e => e.id === lightboxEntryId);
-  if (entry?.images?.[lightboxImageIndex]) {
-    entry.images[lightboxImageIndex].src = dataURL;
-    entry.updatedAt = Date.now();
-    persist();
-    renderAll();
+    const entry = db.entries.find(e => e.id === lightboxEntryId);
+    if (entry?.images?.[lightboxImageIndex]) {
+      entry.images[lightboxImageIndex].note = note;
+      entry.updatedAt = Date.now();
+      persist();
+      renderAll();
 
-    if (reportDraft) {
-      renderReportEntries();
-      ["summary","macro","sector","conclusion"].forEach(sec => {
-        renderReportSectionCards(sec);
-      });
+      if (reportDraft) {
+        renderReportEntries();
+        ["summary","macro","sector","conclusion"].forEach(sec => {
+          renderReportSectionCards(sec);
+        });
+      }
     }
   }
 }
@@ -3260,7 +3262,10 @@ penCanvas.addEventListener('pointermove', e => {
 
 ['pointerup','pointerleave','pointercancel']
   .forEach(ev =>
-    penCanvas.addEventListener(ev, () => drawing = false)
+    penCanvas.addEventListener(ev, () => {
+      drawing = false;
+      penCtx.globalCompositeOperation = "source-over";
+    })
   );
 
 function clearPenCanvas() {
@@ -3281,14 +3286,11 @@ function savePenToImage() {
 
   const dataURL = merged.toDataURL();
 
-  // draft 이미지 저장
   if (lightboxMode === "draft" && lightboxImageIndex !== null) {
     draftImages[lightboxImageIndex].src = dataURL;
-    draftImages[lightboxImageIndex].note += "\n[펜 메모 포함]";
     renderCaptureBoard();
   }
 
-  // entry 이미지 저장
   if (lightboxMode === "entry" && lightboxEntryId) {
     const entry = db.entries.find(e => e.id === lightboxEntryId);
     if (entry?.images?.[lightboxImageIndex]) {
@@ -3296,10 +3298,19 @@ function savePenToImage() {
       entry.updatedAt = Date.now();
       persist();
       renderAll();
+
+      if (reportDraft) {
+        renderReportEntries();
+        ["summary","macro","sector","conclusion"].forEach(sec => {
+          renderReportSectionCards(sec);
+        });
+      }
     }
   }
 
+  document.getElementById('lbImg').src = dataURL;
   clearPenCanvas();
+  setPenTool("pen");
 }
 
 
@@ -4803,6 +4814,11 @@ rdCleanOauthUrlIfNeeded();
   }
 })();
 
+window.rdSignIn = rdSignIn;
+window.rdSignOut = rdSignOut;
+window.rdCloudPull = rdCloudPull;
+window.rdCloudPush = rdCloudPush;
+  
 </script>
 </body>
 </html>
