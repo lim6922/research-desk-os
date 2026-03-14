@@ -1326,25 +1326,13 @@ Research Desk는 단순 메모장이 아니라,<br>
         placeholder="캡처 메모 수정..."
       ></textarea>
 
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
-  <button class="btn btn-ghost btn-mini" id="penToolBtn" onclick="setPenTool('pen')">
-    ✏️ 펜
-  </button>
-  <button class="btn btn-ghost btn-mini" id="eraserToolBtn" onclick="setPenTool('eraser')">
-    🩹 지우개
-  </button>
-  <button class="btn btn-ghost btn-mini" onclick="clearPenCanvas()">
-    🧹 전체 지우기
-  </button>
-</div>
+      <button class="btn btn-success btn-mini" onclick="saveLightboxNote()">
+        ✔ 메모 저장
+      </button>
 
-<button class="btn btn-success btn-mini" onclick="saveLightboxNote()">
-  ✔ 메모 저장
-</button>
-
-<button class="btn btn-primary btn-mini" onclick="savePenToImage()">
-  💾 펜 메모 저장
-</button>
+      <button class="btn btn-primary btn-mini" onclick="savePenToImage()">
+        ✏️ 펜 메모 저장
+      </button>
     </div>
 
   </div>
@@ -3162,7 +3150,6 @@ document.getElementById('lbNoteInput')
 
 function saveLightboxNote() {
   if (lightboxImageIndex === null) return;
-
   const note = document.getElementById('lbNoteInput').value || "";
 
   if (lightboxMode === "draft") {
@@ -3179,17 +3166,9 @@ function saveLightboxNote() {
       entry.updatedAt = Date.now();
       persist();
       renderAll();
-
-      if (reportDraft) {
-        renderReportEntries();
-        ["summary","macro","sector","conclusion"].forEach(sec => {
-          renderReportSectionCards(sec);
-        });
-      }
     }
   }
 }
-
 
 
 
@@ -3200,30 +3179,11 @@ const penCanvas = document.getElementById('penCanvas');
 const penCtx = penCanvas.getContext('2d');
 
 let drawing = false;
-let penTool = "pen";
 
 penCtx.strokeStyle = '#ef4444';
 penCtx.lineWidth = 2;
 penCtx.lineCap = 'round';
 
-
-function setPenTool(tool) {
-  penTool = tool;
-
-  const penBtn = document.getElementById("penToolBtn");
-  const eraserBtn = document.getElementById("eraserToolBtn");
-
-  if (penBtn) {
-    penBtn.classList.toggle("btn-primary", tool === "pen");
-    penBtn.classList.toggle("btn-ghost", tool !== "pen");
-  }
-
-  if (eraserBtn) {
-    eraserBtn.classList.toggle("btn-primary", tool === "eraser");
-    eraserBtn.classList.toggle("btn-ghost", tool !== "eraser");
-  }
-}
-  
 function getPos(e) {
   const rect = penCanvas.getBoundingClientRect();
   return {
@@ -3233,22 +3193,12 @@ function getPos(e) {
 }
 
 penCanvas.addEventListener('pointerdown', e => {
+  // ✅ 손가락 터치는 캔버스가 가로채지 않게 (핀치 줌/스크롤 등)
   if (e.pointerType === 'touch') return;
 
   drawing = true;
   const { x, y } = getPos(e);
-
   penCtx.beginPath();
-
-  if (penTool === "eraser") {
-    penCtx.globalCompositeOperation = "destination-out";
-    penCtx.lineWidth = 16;
-  } else {
-    penCtx.globalCompositeOperation = "source-over";
-    penCtx.strokeStyle = '#ef4444';
-    penCtx.lineWidth = 2;
-  }
-
   penCtx.moveTo(x, y);
 });
 
@@ -3262,10 +3212,7 @@ penCanvas.addEventListener('pointermove', e => {
 
 ['pointerup','pointerleave','pointercancel']
   .forEach(ev =>
-    penCanvas.addEventListener(ev, () => {
-      drawing = false;
-      penCtx.globalCompositeOperation = "source-over";
-    })
+    penCanvas.addEventListener(ev, () => drawing = false)
   );
 
 function clearPenCanvas() {
@@ -3286,11 +3233,14 @@ function savePenToImage() {
 
   const dataURL = merged.toDataURL();
 
+  // draft 이미지 저장
   if (lightboxMode === "draft" && lightboxImageIndex !== null) {
     draftImages[lightboxImageIndex].src = dataURL;
+    draftImages[lightboxImageIndex].note += "\n[펜 메모 포함]";
     renderCaptureBoard();
   }
 
+  // entry 이미지 저장
   if (lightboxMode === "entry" && lightboxEntryId) {
     const entry = db.entries.find(e => e.id === lightboxEntryId);
     if (entry?.images?.[lightboxImageIndex]) {
@@ -3298,19 +3248,10 @@ function savePenToImage() {
       entry.updatedAt = Date.now();
       persist();
       renderAll();
-
-      if (reportDraft) {
-        renderReportEntries();
-        ["summary","macro","sector","conclusion"].forEach(sec => {
-          renderReportSectionCards(sec);
-        });
-      }
     }
   }
 
-  document.getElementById('lbImg').src = dataURL;
   clearPenCanvas();
-  setPenTool("pen");
 }
 
 
@@ -3474,7 +3415,12 @@ ${(e.images || []).length ? `
              cursor:pointer;
              box-shadow:0 2px 6px rgba(0,0,0,.15);
            "
-           onclick="openImgById(${e.id}, ${idx})">
+           onclick="openImg(
+             '${img.src.replace(/'/g,"\\'")}',
+             '${(img.note||"").replace(/'/g,"\\'")}',
+             ${idx},
+             ${e.id}
+           )">
     `).join("")}
   </div>
 ` : ''}
@@ -3794,8 +3740,8 @@ function renderReportSectionCards(section) {
 
     // 📸 캡쳐 미리보기
     const imagesHtml = (e.images || [])
-  .slice(0, 2)
-  .map((img, idx) => `
+      .slice(0, 2)
+      .map(img => `
 <img src="${img.src}"
      style="
        width:120px;
@@ -3805,7 +3751,12 @@ function renderReportSectionCards(section) {
        cursor:pointer;
        box-shadow:0 2px 6px rgba(0,0,0,.1);
      "
-     onclick="openImgById(${e.id}, ${idx})">`).join("");
+     onclick="openImg(
+       '${img.src.replace(/'/g,"\\'")}',
+       '${(img.note||"").replace(/'/g,"\\'")}',
+       0,
+       ${e.id}
+     )">      `).join("");
 
 const commentsHtml = (e.comments || []).length
   ? `
@@ -4589,44 +4540,17 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage
+    detectSessionInUrl: true
   }
 });
-
-const RD_TAB_KEY = "rd_tab_alive";
-
-async function rdPrepareTabScopedSession() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const isOauthReturn = urlParams.has("code") || urlParams.has("error");
-
-  const navEntry = performance.getEntriesByType("navigation")[0];
-  const navType = navEntry?.type || "";
-  const isReloadLike = navType === "reload" || navType === "back_forward";
-
-  const hadTabSession = sessionStorage.getItem(RD_TAB_KEY) === "1";
-
-  // 현재 탭 생존 표시
-  sessionStorage.setItem(RD_TAB_KEY, "1");
-
-  // OAuth 복귀 / 새로고침 / bfcache 복원은 세션 유지
-  if (isOauthReturn || isReloadLike) return;
-
-  // NOTE:
-  // 일부 브라우저(iOS Safari/웹뷰)에서는 navigation type, sessionStorage 동작이 불안정해서
-  // 정상 새로고침/재진입에서도 hadTabSession이 false로 떨어지는 경우가 있어 세션이 풀리는 문제가 발생했다.
-  // 로그인 유지 안정성을 위해 자동 signOut 로직은 비활성화한다.
-  if (!hadTabSession) return;
-}
-  
-
 
 let rdSessionKeepAliveTimer = null;
 
 function rdStartSessionKeepAlive() {
   if (rdSessionKeepAliveTimer) return;
 
-  const refresh = async () => {
+  // 로그인 세션이 짧게 끊기지 않도록 30분마다 토큰 갱신 시도
+  rdSessionKeepAliveTimer = setInterval(async () => {
     try {
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
@@ -4635,18 +4559,7 @@ function rdStartSessionKeepAlive() {
     } catch (err) {
       console.warn("Session keep-alive failed:", err);
     }
-  };
-
-  refresh();
-  rdSessionKeepAliveTimer = setInterval(refresh, 10 * 60 * 1000);
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") refresh();
-  });
-
-  window.addEventListener("focus", refresh);
-  window.addEventListener("pageshow", refresh);
-  window.addEventListener("online", refresh);
+  }, 30 * 60 * 1000);
 }
 
 /** 3. [보안] 강제 초기화 및 로그아웃 */
@@ -4669,6 +4582,7 @@ async function rdForceLogout() {
 /** 4. [게이트키퍼] 허용된 사용자인지 확인 */
 async function rdVerifyAccess(user) {
   try {
+    // allowed_users 테이블에서 이메일 존재 여부 확인
     const { data, error } = await sb
       .from('allowed_users')
       .select('email')
@@ -4682,13 +4596,10 @@ async function rdVerifyAccess(user) {
       await rdForceLogout();
       return false;
     }
-
     return true;
   } catch (err) {
     console.error("Access Verification Error:", err);
-
-    // 일시적 네트워크 오류는 세션 유지
-    return true;
+    return false;
   }
 }
 
@@ -4710,27 +4621,8 @@ function rdRefreshCloudStatus(user) {
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     rdStartSessionKeepAlive();
-
     const isAllowed = await rdVerifyAccess(session.user);
-    if (!isAllowed) return;
-
-    rdRefreshCloudStatus(session.user);
-
-    // OAuth 로그인 직후에만 자동 불러오기
-    if (event === "SIGNED_IN") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isOauthReturn = urlParams.has("code") || urlParams.has("error");
-
-      if (isOauthReturn) {
-        setTimeout(async () => {
-          try {
-            await rdCloudPullAuto();
-          } catch (err) {
-            console.error("자동 불러오기 실패:", err);
-          }
-        }, 300);
-      }
-    }
+    if (isAllowed) rdRefreshCloudStatus(session.user);
   } else {
     rdRefreshCloudStatus(null);
   }
@@ -4850,40 +4742,6 @@ async function rdCloudPull() {
   alert("☁️ 불러오기 완료\n기준시각: " + fmtKST(remoteVer));
 }
 
-async function rdCloudPullAuto() {
-  const user = await rdGetUser();
-  if (!user) return;
-
-  const { data, error } = await sb
-    .from("rd_snapshots")
-    .select("data, data_version, updated_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("자동 불러오기 실패:", error);
-    return;
-  }
-
-  if (!data) return;
-
-  const remoteVer = Number(data.data_version || 0);
-
-  db = data.data;
-  if (!db.meta) db.meta = { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 };
-
-  db.meta.lastImportAt = remoteVer;
-  db.meta.lastExportAt = remoteVer;
-
-  persist();
-  renderAll();
-  updateSyncStatus();
-  renderReportList?.();
-  updateReportEditorState?.();
-
-  console.log("자동 불러오기 완료:", fmtKST(remoteVer));
-}
-  
 /** 8. URL 정리 (OAuth 리다이렉트 파라미터 삭제) */
 async function rdCleanOauthUrlIfNeeded() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -4895,25 +4753,17 @@ async function rdCleanOauthUrlIfNeeded() {
   }
 }
 
-(async () => {
-  await rdPrepareTabScopedSession();
-  await rdCleanOauthUrlIfNeeded();
+rdCleanOauthUrlIfNeeded();
 
+  (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     rdRefreshCloudStatus(isAllowed ? session.user : null);
-  } else {
-    rdRefreshCloudStatus(null);
   }
 })();
 
-window.rdSignIn = rdSignIn;
-window.rdSignOut = rdSignOut;
-window.rdCloudPull = rdCloudPull;
-window.rdCloudPush = rdCloudPush;
-  
 </script>
 </body>
 </html>
