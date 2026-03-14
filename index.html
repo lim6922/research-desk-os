@@ -1648,6 +1648,13 @@ if (e.isAlarm && e.alarm && e.alarm.date) {
   const outgoingLinks = e.links || [];
   const incomingLinks = db.entries.filter(x => (x.links || []).includes(e.id));
   const incoming = getIncomingLinks(e.id);
+  const outgoingBadge = outgoingLinks.length
+    ? `<span class="link-summary"
+              style="background:#dcfce7;color:#166534;"
+              onclick="jumpToNote(${outgoingLinks[0]})">
+         🔗 연결함 ${outgoingLinks.length}
+       </span>`
+    : '';
   const incomingBadge = incoming.length
     ? `<span class="link-summary"
               style="background:#ecfeff;color:#0369a1;"
@@ -1716,6 +1723,7 @@ ${e.tags ? e.tags.split(',').map(t => `
             P ${fmtNum(e.trade.entry)} · T ${fmtNum(e.trade.target)} · S ${fmtNum(e.trade.stop)} · ${e.trade.status}
             ${roi ? ` · ${roi}` : ''}
           </div>` : ''}
+  ${outgoingBadge}
   ${incomingBadge}
       </div>
       <div style="display:flex; gap:6px;">
@@ -4592,7 +4600,51 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 let rdSessionKeepAliveTimer = null;
+const RD_SESSION_BACKUP_KEY = "rd_supabase_session_backup_v1";
 
+function rdBackupSession(session) {
+  try {
+    if (!session?.access_token || !session?.refresh_token) return;
+    localStorage.setItem(RD_SESSION_BACKUP_KEY, JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at || 0,
+      saved_at: Date.now()
+    }));
+  } catch (err) {
+    console.warn("Session backup failed:", err);
+  }
+}
+
+function rdClearSessionBackup() {
+  try { localStorage.removeItem(RD_SESSION_BACKUP_KEY); } catch {}
+}
+
+async function rdRestoreSessionFromBackup() {
+  try {
+    const raw = localStorage.getItem(RD_SESSION_BACKUP_KEY);
+    if (!raw) return null;
+
+    const backup = JSON.parse(raw);
+    if (!backup?.access_token || !backup?.refresh_token) return null;
+
+    const { data, error } = await sb.auth.setSession({
+      access_token: backup.access_token,
+      refresh_token: backup.refresh_token
+    });
+
+    if (error) {
+      console.warn("Session restore failed:", error);
+      return null;
+    }
+
+    return data?.session || null;
+  } catch (err) {
+    console.warn("Session restore exception:", err);
+    return null;
+  }
+}
+  
 function rdStartSessionKeepAlive() {
   if (rdSessionKeepAliveTimer) return;
 
@@ -4618,6 +4670,7 @@ async function rdForceLogout() {
     meta: { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 }
   };
   localStorage.removeItem('rd_v10_5');
+  rdClearSessionBackup();
   
   // Supabase 세션 종료
   await sb.auth.signOut();
@@ -4667,10 +4720,12 @@ function rdRefreshCloudStatus(user) {
 /** 6. 로그인 상태 변경 감지 이벤트 */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
+    rdBackupSession(session);
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     if (isAllowed) rdRefreshCloudStatus(session.user);
   } else {
+    if (event === "SIGNED_OUT") rdClearSessionBackup();
     rdRefreshCloudStatus(null);
   }
 });
@@ -4811,7 +4866,13 @@ rdCleanOauthUrlIfNeeded();
     session = refreshed?.data?.session || null;
   }
 
+  // 일부 환경에서 refreshSession도 비어오는 경우 백업 토큰으로 1회 복원
+  if (!session) {
+    session = await rdRestoreSessionFromBackup();
+  }
+
   if (session?.user) {
+    rdBackupSession(session);
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     rdRefreshCloudStatus(isAllowed ? session.user : null);
