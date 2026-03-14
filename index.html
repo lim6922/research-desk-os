@@ -1326,13 +1326,25 @@ Research Desk는 단순 메모장이 아니라,<br>
         placeholder="캡처 메모 수정..."
       ></textarea>
 
-      <button class="btn btn-success btn-mini" onclick="saveLightboxNote()">
-        ✔ 메모 저장
-      </button>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+  <button class="btn btn-ghost btn-mini" id="penToolBtn" onclick="setPenTool('pen')">
+    ✏️ 펜
+  </button>
+  <button class="btn btn-ghost btn-mini" id="eraserToolBtn" onclick="setPenTool('eraser')">
+    🩹 지우개
+  </button>
+  <button class="btn btn-ghost btn-mini" onclick="clearPenCanvas()">
+    🧹 전체 지우기
+  </button>
+</div>
 
-      <button class="btn btn-primary btn-mini" onclick="savePenToImage()">
-        ✏️ 펜 메모 저장
-      </button>
+<button class="btn btn-success btn-mini" onclick="saveLightboxNote()">
+  ✔ 메모 저장
+</button>
+
+<button class="btn btn-primary btn-mini" onclick="savePenToImage()">
+  💾 펜 메모 저장
+</button>
     </div>
 
   </div>
@@ -3160,15 +3172,22 @@ function saveLightboxNote() {
   }
 
   if (lightboxMode === "entry" && lightboxEntryId) {
-    const entry = db.entries.find(e => e.id === lightboxEntryId);
-    if (entry?.images?.[lightboxImageIndex]) {
-      entry.images[lightboxImageIndex].note = note;
-      entry.updatedAt = Date.now();
-      persist();
-      renderAll();
+  const entry = db.entries.find(e => e.id === lightboxEntryId);
+  if (entry?.images?.[lightboxImageIndex]) {
+    entry.images[lightboxImageIndex].src = dataURL;
+    entry.updatedAt = Date.now();
+    persist();
+    renderAll();
+
+    if (reportDraft) {
+      renderReportEntries();
+      ["summary","macro","sector","conclusion"].forEach(sec => {
+        renderReportSectionCards(sec);
+      });
     }
   }
 }
+
 
 
 
@@ -3179,11 +3198,30 @@ const penCanvas = document.getElementById('penCanvas');
 const penCtx = penCanvas.getContext('2d');
 
 let drawing = false;
+let penTool = "pen";
 
 penCtx.strokeStyle = '#ef4444';
 penCtx.lineWidth = 2;
 penCtx.lineCap = 'round';
 
+
+function setPenTool(tool) {
+  penTool = tool;
+
+  const penBtn = document.getElementById("penToolBtn");
+  const eraserBtn = document.getElementById("eraserToolBtn");
+
+  if (penBtn) {
+    penBtn.classList.toggle("btn-primary", tool === "pen");
+    penBtn.classList.toggle("btn-ghost", tool !== "pen");
+  }
+
+  if (eraserBtn) {
+    eraserBtn.classList.toggle("btn-primary", tool === "eraser");
+    eraserBtn.classList.toggle("btn-ghost", tool !== "eraser");
+  }
+}
+  
 function getPos(e) {
   const rect = penCanvas.getBoundingClientRect();
   return {
@@ -3193,12 +3231,22 @@ function getPos(e) {
 }
 
 penCanvas.addEventListener('pointerdown', e => {
-  // ✅ 손가락 터치는 캔버스가 가로채지 않게 (핀치 줌/스크롤 등)
   if (e.pointerType === 'touch') return;
 
   drawing = true;
   const { x, y } = getPos(e);
+
   penCtx.beginPath();
+
+  if (penTool === "eraser") {
+    penCtx.globalCompositeOperation = "destination-out";
+    penCtx.lineWidth = 16;
+  } else {
+    penCtx.globalCompositeOperation = "source-over";
+    penCtx.strokeStyle = '#ef4444';
+    penCtx.lineWidth = 2;
+  }
+
   penCtx.moveTo(x, y);
 });
 
@@ -3415,12 +3463,7 @@ ${(e.images || []).length ? `
              cursor:pointer;
              box-shadow:0 2px 6px rgba(0,0,0,.15);
            "
-           onclick="openImg(
-             '${img.src.replace(/'/g,"\\'")}',
-             '${(img.note||"").replace(/'/g,"\\'")}',
-             ${idx},
-             ${e.id}
-           )">
+           onclick="openImgById(${e.id}, ${idx})">
     `).join("")}
   </div>
 ` : ''}
@@ -3740,8 +3783,8 @@ function renderReportSectionCards(section) {
 
     // 📸 캡쳐 미리보기
     const imagesHtml = (e.images || [])
-      .slice(0, 2)
-      .map(img => `
+  .slice(0, 2)
+  .map((img, idx) => `
 <img src="${img.src}"
      style="
        width:120px;
@@ -3751,12 +3794,7 @@ function renderReportSectionCards(section) {
        cursor:pointer;
        box-shadow:0 2px 6px rgba(0,0,0,.1);
      "
-     onclick="openImg(
-       '${img.src.replace(/'/g,"\\'")}',
-       '${(img.note||"").replace(/'/g,"\\'")}',
-       0,
-       ${e.id}
-     )">      `).join("");
+     onclick="openImgById(${e.id}, ${idx})">`).join("");
 
 const commentsHtml = (e.comments || []).length
   ? `
@@ -4540,7 +4578,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storage: window.sessionStorage
   }
 });
 
