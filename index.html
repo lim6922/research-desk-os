@@ -4888,7 +4888,7 @@ async function rdCloudPullAuto() {
   const url = new URL(window.location.href);
 
   if (url.searchParams.has("code")) {
-    const { error: exchangeError } = await sb.auth.exchangeCodeForSession(window.location.href);
+    const { error: exchangeError } = await sb.auth.exchangeCodeForSession(authCode)
     if (exchangeError) {
       console.error("OAuth code exchange error:", exchangeError);
       alert("로그인 세션 복원 실패: " + exchangeError.message);
