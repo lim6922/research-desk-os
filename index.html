@@ -4561,9 +4561,8 @@ function collapseTreeToActive(){
 
 /************************************************-----------
  * Supabase Cloud Sync & Gatekeeper
- * - Alpha Blotter 방식으로 단순화
- * - getSession() 기준으로만 인증 판단
- * - PKCE + detectSessionInUrl 사용
+ * - OAuth code를 명시적으로 교환
+ * - 새로고침 후 세션 유지 안정화
  ************************************************-----------*/
 
 /** 1. KST 표시 헬퍼 */
@@ -4589,7 +4588,6 @@ function fmtKST(ts) {
 /** 2. Supabase 설정 */
 const APP_BASE_URL = window.location.origin + window.location.pathname;
 
-// 인라인 onclick 안전장치
 window.rdSignIn = window.rdSignIn || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
 window.rdSignOut = window.rdSignOut || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
 window.rdCloudPull = window.rdCloudPull || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
@@ -4602,7 +4600,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,
     flowType: "pkce",
     storageKey: "rd-supabase-auth",
     storage: window.localStorage
@@ -4655,9 +4653,7 @@ async function rdForceLogout() {
   };
 
   localStorage.removeItem("rd_v10_5");
-
   await sb.auth.signOut();
-
   window.location.href = APP_BASE_URL;
 }
 
@@ -4725,10 +4721,6 @@ sb.auth.onAuthStateChange(async (event, session) => {
 
     rdRefreshCloudStatus(session.user);
     rdStartSessionKeepAlive();
-
-    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-      await rdCloudPullAuto();
-    }
   } else {
     rdRefreshCloudStatus(null);
   }
@@ -4893,6 +4885,17 @@ async function rdCloudPullAuto() {
 (async () => {
   await rdPrepareTabScopedSession();
 
+  const url = new URL(window.location.href);
+
+  if (url.searchParams.has("code")) {
+    const { error: exchangeError } = await sb.auth.exchangeCodeForSession(window.location.href);
+    if (exchangeError) {
+      console.error("OAuth code exchange error:", exchangeError);
+      alert("로그인 세션 복원 실패: " + exchangeError.message);
+    }
+    rdCleanOauthUrlIfNeeded();
+  }
+
   const { data, error } = await sb.auth.getSession();
 
   if (error) {
@@ -4915,8 +4918,6 @@ async function rdCloudPullAuto() {
 
     updateSyncStatus();
   }
-
-  rdCleanOauthUrlIfNeeded();
 })();
 
 /** 16. 전역 바인딩 */
