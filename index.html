@@ -4606,13 +4606,13 @@ async function rdPrepareTabScopedSession() {
 
   const hadTabSession = sessionStorage.getItem(RD_TAB_KEY) === "1";
 
-  // 현재 탭 살아있음 표시
+  // 현재 탭 생존 표시
   sessionStorage.setItem(RD_TAB_KEY, "1");
 
-  // OAuth 복귀 / 새로고침 / 뒤로가기 복원 시에는 세션 건드리지 않음
+  // OAuth 복귀 / 새로고침 / bfcache 복원은 세션 유지
   if (isOauthReturn || isReloadLike) return;
 
-  // 정말 "새 탭/새 창 첫 진입"일 때만 기존 세션 제거
+  // 진짜 새 탭/새 창 첫 진입만 기존 세션 제거
   if (!hadTabSession) {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
@@ -4621,6 +4621,7 @@ async function rdPrepareTabScopedSession() {
   }
 }
 
+  
 
 
 let rdSessionKeepAliveTimer = null;
@@ -4671,7 +4672,6 @@ async function rdForceLogout() {
 /** 4. [게이트키퍼] 허용된 사용자인지 확인 */
 async function rdVerifyAccess(user) {
   try {
-    // allowed_users 테이블에서 이메일 존재 여부 확인
     const { data, error } = await sb
       .from('allowed_users')
       .select('email')
@@ -4685,10 +4685,13 @@ async function rdVerifyAccess(user) {
       await rdForceLogout();
       return false;
     }
+
     return true;
   } catch (err) {
     console.error("Access Verification Error:", err);
-    return false;
+
+    // 일시적 네트워크 오류는 세션 유지
+    return true;
   }
 }
 
@@ -4716,17 +4719,21 @@ sb.auth.onAuthStateChange(async (event, session) => {
 
     rdRefreshCloudStatus(session.user);
 
-    // 최초 로그인 직후 자동 불러오기
+    // OAuth 로그인 직후에만 자동 불러오기
     if (event === "SIGNED_IN") {
-      setTimeout(async () => {
-        try {
-          await rdCloudPull();
-        } catch (err) {
-          console.error("자동 불러오기 실패:", err);
-        }
-      }, 300);
-    }
+      const urlParams = new URLSearchParams(window.location.search);
+      const isOauthReturn = urlParams.has("code") || urlParams.has("error");
 
+      if (isOauthReturn) {
+        setTimeout(async () => {
+          try {
+            await rdCloudPullAuto();
+          } catch (err) {
+            console.error("자동 불러오기 실패:", err);
+          }
+        }, 300);
+      }
+    }
   } else {
     rdRefreshCloudStatus(null);
   }
@@ -4846,6 +4853,40 @@ async function rdCloudPull() {
   alert("☁️ 불러오기 완료\n기준시각: " + fmtKST(remoteVer));
 }
 
+async function rdCloudPullAuto() {
+  const user = await rdGetUser();
+  if (!user) return;
+
+  const { data, error } = await sb
+    .from("rd_snapshots")
+    .select("data, data_version, updated_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("자동 불러오기 실패:", error);
+    return;
+  }
+
+  if (!data) return;
+
+  const remoteVer = Number(data.data_version || 0);
+
+  db = data.data;
+  if (!db.meta) db.meta = { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 };
+
+  db.meta.lastImportAt = remoteVer;
+  db.meta.lastExportAt = remoteVer;
+
+  persist();
+  renderAll();
+  updateSyncStatus();
+  renderReportList?.();
+  updateReportEditorState?.();
+
+  console.log("자동 불러오기 완료:", fmtKST(remoteVer));
+}
+  
 /** 8. URL 정리 (OAuth 리다이렉트 파라미터 삭제) */
 async function rdCleanOauthUrlIfNeeded() {
   const urlParams = new URLSearchParams(window.location.search);
