@@ -4612,14 +4612,11 @@ async function rdPrepareTabScopedSession() {
   // OAuth 복귀 / 새로고침 / bfcache 복원은 세션 유지
   if (isOauthReturn || isReloadLike) return;
 
-  // 진짜 새 탭/새 창 첫 진입만 기존 세션 제거
-  if (!hadTabSession) {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      await sb.auth.signOut();
-    }
-  }
-}
+  // NOTE:
+  // 일부 브라우저(iOS Safari/웹뷰)에서는 navigation type, sessionStorage 동작이 불안정해서
+  // 정상 새로고침/재진입에서도 hadTabSession이 false로 떨어지는 경우가 있어 세션이 풀리는 문제가 발생했다.
+  // 로그인 유지 안정성을 위해 자동 signOut 로직은 비활성화한다.
+  if (!hadTabSession) return;
 
   
 
