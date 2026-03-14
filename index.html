@@ -4600,15 +4600,19 @@ async function rdPrepareTabScopedSession() {
   const urlParams = new URLSearchParams(window.location.search);
   const isOauthReturn = urlParams.has("code") || urlParams.has("error");
 
+  const navEntry = performance.getEntriesByType("navigation")[0];
+  const navType = navEntry?.type || "";
+  const isReloadLike = navType === "reload" || navType === "back_forward";
+
   const hadTabSession = sessionStorage.getItem(RD_TAB_KEY) === "1";
 
-  // 현재 탭이 살아있다는 표시
+  // 현재 탭 살아있음 표시
   sessionStorage.setItem(RD_TAB_KEY, "1");
 
-  // OAuth 로그인 리다이렉트 복귀 중이면 로그아웃 처리 금지
-  if (isOauthReturn) return;
+  // OAuth 복귀 / 새로고침 / 뒤로가기 복원 시에는 세션 건드리지 않음
+  if (isOauthReturn || isReloadLike) return;
 
-  // 새 탭/새 창으로 처음 열린 경우: 기존 localStorage 세션이 있더라도 강제 로그아웃
+  // 정말 "새 탭/새 창 첫 진입"일 때만 기존 세션 제거
   if (!hadTabSession) {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
@@ -4616,7 +4620,8 @@ async function rdPrepareTabScopedSession() {
     }
   }
 }
-  
+
+
 
 let rdSessionKeepAliveTimer = null;
 
