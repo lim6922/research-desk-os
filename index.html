@@ -2054,16 +2054,31 @@ function confirmLink(targetId) {
     return;
   }
 
-  // 🔹 기존 가설 ↔ 가설 링크
-  if (linkingTargetId) {
-    const entry = db.entries.find(x => x.id === linkingTargetId);
-    if (!entry.links) entry.links = [];
-    if (!entry.links.includes(targetId)) {
-      entry.links.push(targetId);
-      persist();
-      renderAll();
+  // 🔹 새 카드/수정 중인 카드의 draft 링크 저장
+  if (linkingTargetId == null) {
+    if (!draftLinks.includes(targetId)) {
+      draftLinks.push(targetId);
     }
+    toggleModal('linkModal');
+    return;
   }
+
+  // 🔹 기존 저장된 가설 ↔ 가설 링크
+  const entry = db.entries.find(x => x.id === linkingTargetId);
+  if (!entry) {
+    toggleModal('linkModal');
+    return;
+  }
+
+  if (!entry.links) entry.links = [];
+  if (!entry.links.includes(targetId)) {
+    entry.links.push(targetId);
+    entry.updatedAt = Date.now();
+    persist();
+    renderAll();
+    updateSyncStatus();
+  }
+
   toggleModal('linkModal');
 }
 
@@ -4682,7 +4697,6 @@ async function rdForceLogout() {
 /** 4. [게이트키퍼] 허용된 사용자인지 확인 */
 async function rdVerifyAccess(user) {
   try {
-    // allowed_users 테이블에서 이메일 존재 여부 확인
     const { data, error } = await sb
       .from('allowed_users')
       .select('email')
@@ -4696,10 +4710,11 @@ async function rdVerifyAccess(user) {
       await rdForceLogout();
       return false;
     }
+
     return true;
   } catch (err) {
     console.error("Access Verification Error:", err);
-    return false;
+    return null;
   }
 }
 
@@ -4727,22 +4742,28 @@ function rdRefreshCloudStatusLoading() {
 
 /** 6. 로그인 상태 변경 감지 이벤트 */
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    rdBackupSession(session);
-    rdStartSessionKeepAlive();
+  try {
+    if (session?.user) {
+      rdBackupSession(session);
+      rdStartSessionKeepAlive();
 
-    const isAllowed = await rdVerifyAccess(session.user);
-    if (isAllowed) {
-      rdRefreshCloudStatus(session.user);
+      const isAllowed = await rdVerifyAccess(session.user);
+
+      if (isAllowed === true) {
+        rdRefreshCloudStatus(session.user);
+      } else if (isAllowed === false) {
+        rdRefreshCloudStatus(null);
+      }
+
+      return;
     }
 
-    return;
-  }
-
-  // 새로고침 직후의 일시적 null 세션에는 local mode로 바꾸지 않음
-  // 진짜 로그아웃일 때만 local mode 처리
-  if (event === "SIGNED_OUT") {
-    rdClearSessionBackup();
+    if (event === "SIGNED_OUT") {
+      rdClearSessionBackup();
+      rdRefreshCloudStatus(null);
+    }
+  } catch (err) {
+    console.error("onAuthStateChange failed:", err);
     rdRefreshCloudStatus(null);
   }
 });
@@ -4877,31 +4898,40 @@ rdCleanOauthUrlIfNeeded();
   async function rdInitAuth() {
   rdRefreshCloudStatusLoading();
 
-  let { data: { session } } = await sb.auth.getSession();
+  try {
+    let { data: { session } } = await sb.auth.getSession();
 
-  // 새로고침 직후 세션 복원이 늦는 경우 1회 보정
-  if (!session) {
-    const refreshed = await sb.auth.refreshSession();
-    session = refreshed?.data?.session || null;
-  }
+    // 새로고침 직후 세션 복원이 늦는 경우 1회 보정
+    if (!session) {
+      try {
+        const refreshed = await sb.auth.refreshSession();
+        session = refreshed?.data?.session || null;
+      } catch (err) {
+        console.warn("refreshSession failed:", err);
+      }
+    }
 
-  // 그래도 없으면 백업 토큰으로 1회 복원
-  if (!session) {
-    session = await rdRestoreSessionFromBackup();
-  }
+    // 그래도 없으면 백업 토큰으로 1회 복원
+    if (!session) {
+      session = await rdRestoreSessionFromBackup();
+    }
 
-  if (session?.user) {
-    rdBackupSession(session);
-    rdStartSessionKeepAlive();
+    if (session?.user) {
+      rdBackupSession(session);
+      rdStartSessionKeepAlive();
 
-    const isAllowed = await rdVerifyAccess(session.user);
+      const isAllowed = await rdVerifyAccess(session.user);
 
-    if (isAllowed) {
-      rdRefreshCloudStatus(session.user);
+      if (isAllowed === true) {
+        rdRefreshCloudStatus(session.user);
+      } else {
+        rdRefreshCloudStatus(null);
+      }
     } else {
       rdRefreshCloudStatus(null);
     }
-  } else {
+  } catch (err) {
+    console.error("rdInitAuth failed:", err);
     rdRefreshCloudStatus(null);
   }
 }
