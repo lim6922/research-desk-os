@@ -4617,7 +4617,7 @@ async function rdPrepareTabScopedSession() {
   // 정상 새로고침/재진입에서도 hadTabSession이 false로 떨어지는 경우가 있어 세션이 풀리는 문제가 발생했다.
   // 로그인 유지 안정성을 위해 자동 signOut 로직은 비활성화한다.
   if (!hadTabSession) return;
-
+}
   
 
 
