@@ -4580,10 +4580,10 @@ function collapseTreeToActive(){
 
 
 /************************************************-----------
- * Supabase Cloud Sync & Gatekeeper (v260302 Final)
+ * Supabase Cloud Sync & Gatekeeper (Alpha Blotter Style)
  *************************************************----------*/
 
-/** 1. [도움함수] 타임스탬프를 KST 문자열로 변환 (ReferenceError 방지용 최상단 배치) */
+/** 1. KST 표시 헬퍼 */
 function fmtKST(ts) {
   if (!ts || ts === 0) return "-";
   try {
@@ -4594,8 +4594,8 @@ function fmtKST(ts) {
       hour: "2-digit", minute: "2-digit", second: "2-digit",
       hour12: false
     });
-  } catch(e) { 
-    return "-"; 
+  } catch (e) {
+    return "-";
   }
 }
 
@@ -4610,115 +4610,11 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: window.localStorage,
-    storageKey: 'rd_supabase_auth_v1'
+    storageKey: "research_desk_supabase_auth_v1"
   }
 });
 
-let rdSessionKeepAliveTimer = null;
-const RD_SESSION_BACKUP_KEY = "rd_supabase_session_backup_v1";
-
-function rdBackupSession(session) {
-  try {
-    if (!session?.access_token || !session?.refresh_token) return;
-    localStorage.setItem(RD_SESSION_BACKUP_KEY, JSON.stringify({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-      expires_at: session.expires_at || 0,
-      saved_at: Date.now()
-    }));
-  } catch (err) {
-    console.warn("Session backup failed:", err);
-  }
-}
-
-function rdClearSessionBackup() {
-  try { localStorage.removeItem(RD_SESSION_BACKUP_KEY); } catch {}
-}
-
-async function rdRestoreSessionFromBackup() {
-  try {
-    const raw = localStorage.getItem(RD_SESSION_BACKUP_KEY);
-    if (!raw) return null;
-
-    const backup = JSON.parse(raw);
-    if (!backup?.access_token || !backup?.refresh_token) return null;
-
-    const { data, error } = await sb.auth.setSession({
-      access_token: backup.access_token,
-      refresh_token: backup.refresh_token
-    });
-
-    if (error) {
-      console.warn("Session restore failed:", error);
-      return null;
-    }
-
-    return data?.session || null;
-  } catch (err) {
-    console.warn("Session restore exception:", err);
-    return null;
-  }
-}
-  
-function rdStartSessionKeepAlive() {
-  if (rdSessionKeepAliveTimer) return;
-
-  // 로그인 세션이 짧게 끊기지 않도록 30분마다 토큰 갱신 시도
-  rdSessionKeepAliveTimer = setInterval(async () => {
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (session) {
-        await sb.auth.refreshSession();
-      }
-    } catch (err) {
-      console.warn("Session keep-alive failed:", err);
-    }
-  }, 30 * 60 * 1000);
-}
-
-/** 3. [보안] 강제 초기화 및 로그아웃 */
-async function rdForceLogout() {
-  // 로컬 데이터 즉시 파괴
-  db = {
-    entries: [],
-    reports: [],
-    meta: { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 }
-  };
-  localStorage.removeItem('rd_v10_5');
-  rdClearSessionBackup();
-  
-  // Supabase 세션 종료
-  await sb.auth.signOut();
-  
-  // 초기 상태로 페이지 새로고침
-  window.location.href = APP_BASE_URL;
-}
-
-/** 4. [게이트키퍼] 허용된 사용자인지 확인 */
-async function rdVerifyAccess(user) {
-  try {
-    const { data, error } = await sb
-      .from('allowed_users')
-      .select('email')
-      .eq('email', user.email)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    if (!data) {
-      alert(`❌ 접근 거부: [${user.email}]은 등록되지 않은 계정입니다.\n관리자에게 승인을 요청하세요.`);
-      await rdForceLogout();
-      return false;
-    }
-
-    return true;
-  } catch (err) {
-    console.error("Access Verification Error:", err);
-    return null;
-  }
-}
-
-/** 5. 클라우드 상태 표시 바 업데이트 */
+/** 3. 상태 표시 */
 function rdRefreshCloudStatus(user) {
   const el = document.getElementById("cloudFloatStatus");
   if (!el) return;
@@ -4740,75 +4636,163 @@ function rdRefreshCloudStatusLoading() {
   el.style.color = "#f59e0b";
 }
 
-/** 6. 로그인 상태 변경 감지 이벤트 */
-sb.auth.onAuthStateChange(async (event, session) => {
+/** 4. OAuth URL 정리 */
+async function rdCleanOauthUrlIfNeeded() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has("code") || url.searchParams.has("error")) {
+    history.replaceState({}, document.title, url.pathname);
+  }
+}
+
+/** 5. 현재 유저 조회 */
+async function rdGetUser() {
+  const { data, error } = await sb.auth.getUser();
+  if (error) {
+    console.error("rdGetUser error:", error);
+    return null;
+  }
+  return data?.user || null;
+}
+
+/** 6. 허용 계정 확인 */
+async function rdVerifyAccess(user) {
   try {
-    if (session?.user) {
-      rdBackupSession(session);
-      rdStartSessionKeepAlive();
+    if (!user?.email) return false;
 
-      const isAllowed = await rdVerifyAccess(session.user);
+    const normalizedEmail = String(user.email).trim().toLowerCase();
 
-      if (isAllowed === true) {
-        rdRefreshCloudStatus(session.user);
-      } else if (isAllowed === false) {
-        rdRefreshCloudStatus(null);
-      }
+    const { data, error } = await sb
+      .from("allowed_users")
+      .select("email")
+      .eq("email", normalizedEmail)
+      .limit(1);
 
+    if (error) throw error;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      alert(`❌ 접근 거부: [${user.email}]은 등록되지 않은 계정입니다.\n관리자에게 승인을 요청하세요.`);
+      await sb.auth.signOut();
+      rdRefreshCloudStatus(null);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Access Verification Error:", err);
+    alert("허용 계정 확인 중 오류가 발생했습니다.");
+    return false;
+  }
+}
+
+/** 7. 로그인 상태 UI 갱신 */
+async function rdUpdateAuthUI() {
+  rdRefreshCloudStatusLoading();
+
+  try {
+    const { data, error } = await sb.auth.getSession();
+
+    if (error) {
+      console.error("Session check failed:", error);
+      rdRefreshCloudStatus(null);
       return;
     }
 
-    if (event === "SIGNED_OUT") {
-      rdClearSessionBackup();
+    const user = data?.session?.user || null;
+
+    if (!user) {
       rdRefreshCloudStatus(null);
+      return;
     }
+
+    const allowed = await rdVerifyAccess(user);
+    if (!allowed) {
+      rdRefreshCloudStatus(null);
+      return;
+    }
+
+    rdRefreshCloudStatus(user);
   } catch (err) {
-    console.error("onAuthStateChange failed:", err);
+    console.error("rdUpdateAuthUI failed:", err);
     rdRefreshCloudStatus(null);
   }
-});
+}
 
-/** 7. 클라우드 서비스 함수들 */
-
+/** 8. 로그인 */
 async function rdSignIn() {
-  const { error } = await sb.auth.signInWithOAuth({
+  const { data, error } = await sb.auth.getSession();
+
+  if (error) {
+    alert("로그인 상태 확인 실패: " + error.message);
+    return;
+  }
+
+  if (data?.session?.user) {
+    const allowed = await rdVerifyAccess(data.session.user);
+    if (allowed) {
+      rdRefreshCloudStatus(data.session.user);
+      alert("이미 로그인되어 있습니다.");
+      return;
+    }
+    return;
+  }
+
+  const { error: signInError } = await sb.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo: APP_BASE_URL,
       queryParams: { prompt: "select_account" }
     }
   });
-  if (error) alert("로그인 실패: " + error.message);
+
+  if (signInError) {
+    alert("로그인 실패: " + signInError.message);
+  }
 }
 
+/** 9. 로그아웃 */
 async function rdSignOut() {
-  if (!confirm("로그아웃 하시겠습니까?\n로그아웃 시 현재 브라우저의 데이터는 모두 초기화(삭제)됩니다.")) return;
-  await rdForceLogout();
-}
+  const ok = confirm("로그아웃 하시겠습니까?");
+  if (!ok) return;
 
-async function rdGetUser() {
-  const { data: { user } } = await sb.auth.getUser();
-  return user || null;
-}
-
-async function rdCloudPush() {
-  const user = await rdGetUser();
-  if (!user) return alert("먼저 로그인하세요.");
-
-  // [보안 추가] 업로드 직전 화이트리스트 실시간 재검증
-  const { data: isAllowed, error: authError } = await sb
-    .from('allowed_users')
-    .select('email')
-    .eq('email', user.email)
-    .maybeSingle();
-
-  if (authError || !isAllowed) {
-    alert(`❌ 허용되지 않은 계정입니다.\n관리자에게 [${user.email}] 승인을 요청하세요.`);
-    await rdForceLogout(); // 즉시 퇴출
+  const { error } = await sb.auth.signOut();
+  if (error) {
+    alert("로그아웃 실패: " + error.message);
     return;
   }
 
+  rdRefreshCloudStatus(null);
+  alert("로그아웃 되었습니다.");
+}
+
+/** 10. 강제 로그아웃 */
+async function rdForceLogout() {
+  try {
+    await sb.auth.signOut();
+  } catch (err) {
+    console.error("Force logout failed:", err);
+  }
+  rdRefreshCloudStatus(null);
+}
+
+/** 11. 클라우드 업로드 */
+async function rdCloudPush() {
+  const user = await rdGetUser();
+  if (!user) {
+    alert("먼저 로그인하세요.");
+    await rdUpdateAuthUI();
+    return;
+  }
+
+  const allowed = await rdVerifyAccess(user);
+  if (!allowed) return;
+
   const dataVer = Number(getLocalDataLastTs() || 0);
+
+  const ok = confirm(
+    `☁️ 업로드(클라우드 덮어쓰기)\n로컬 데이터 시점: ${fmtKST(dataVer)}\n진행할까요?`
+  );
+  if (!ok) return;
+
   const payload = {
     user_id: user.id,
     data: db,
@@ -4816,33 +4800,34 @@ async function rdCloudPush() {
     updated_at: new Date().toISOString()
   };
 
-  const ok = confirm(`☁️ 업로드(클라우드 덮어쓰기)\n로컬 데이터 시점: ${fmtKST(dataVer)}\n진행할까요?`);
-  if (!ok) return;
+  const { error } = await sb
+    .from("rd_snapshots")
+    .upsert(payload, { onConflict: "user_id" });
 
-  const { error } = await sb.from("rd_snapshots").upsert(payload, { onConflict: "user_id" });
-  
   if (error) {
-    // DB의 RLS 정책에 의해 걸러질 경우
-    if (error.message.includes("row-level security") || error.code === "42501") {
-      alert("❌ 보안 정책에 의해 거부되었습니다. (화이트리스트 계정이 아님)");
-      await rdForceLogout();
-    } else {
-      alert("업로드 실패: " + error.message);
-    }
+    console.error(error);
+    alert("업로드 실패: " + error.message);
     return;
   }
 
   db.meta.lastExportAt = dataVer;
   persist();
   updateSyncStatus();
+
   alert("☁️ 업로드 완료\n시점: " + fmtKST(dataVer));
 }
 
-
-
+/** 12. 클라우드 불러오기 */
 async function rdCloudPull() {
   const user = await rdGetUser();
-  if (!user) return alert("먼저 로그인하세요.");
+  if (!user) {
+    alert("먼저 로그인하세요.");
+    await rdUpdateAuthUI();
+    return;
+  }
+
+  const allowed = await rdVerifyAccess(user);
+  if (!allowed) return;
 
   const { data, error } = await sb
     .from("rd_snapshots")
@@ -4851,24 +4836,25 @@ async function rdCloudPull() {
     .maybeSingle();
 
   if (error) {
-    if (error.message.includes("row-level security")) {
-      alert("❌ 접근 권한이 없습니다.");
-      await rdForceLogout();
-    } else {
-      alert("불러오기 실패: " + error.message);
-    }
+    console.error(error);
+    alert("불러오기 실패: " + error.message);
     return;
   }
-  
-  if (!data) return alert("클라우드에 저장된 데이터가 없습니다.");
+
+  if (!data) {
+    alert("클라우드에 저장된 데이터가 없습니다.");
+    return;
+  }
 
   const remoteVer = Number(data.data_version || 0);
-  const msg = `☁️ 클라우드 데이터를 불러올까요?\n(로컬 데이터가 삭제됩니다)\n\nCloud 데이터 시점: ${fmtKST(remoteVer)}`;
 
-  if (!confirm(msg)) return;
+  const ok = confirm(
+    `☁️ 클라우드 데이터를 불러올까요?\n(로컬 데이터가 삭제됩니다)\n\nCloud 데이터 시점: ${fmtKST(remoteVer)}`
+  );
+  if (!ok) return;
 
-  db = data.data;
-  if (!db.meta) db.meta = { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 };
+  db = data.data || { entries: [], reports: [], meta: {} };
+  if (!db.meta) db.meta = { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 };
 
   db.meta.lastImportAt = remoteVer;
   db.meta.lastExportAt = remoteVer;
@@ -4882,58 +4868,34 @@ async function rdCloudPull() {
   alert("☁️ 불러오기 완료\n기준시각: " + fmtKST(remoteVer));
 }
 
-/** 8. URL 정리 (OAuth 리다이렉트 파라미터 삭제) */
-async function rdCleanOauthUrlIfNeeded() {
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has("code") || urlParams.has("error")) {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      history.replaceState(null, "", APP_BASE_URL);
-    }
-  }
-}
-
-rdCleanOauthUrlIfNeeded();
-
-  async function rdInitAuth() {
-  rdRefreshCloudStatusLoading();
-
-  try {
-    let { data: { session } } = await sb.auth.getSession();
-
-    // 새로고침 직후 세션 복원이 늦는 경우 1회 보정
-    if (!session) {
-      try {
-        const refreshed = await sb.auth.refreshSession();
-        session = refreshed?.data?.session || null;
-      } catch (err) {
-        console.warn("refreshSession failed:", err);
-      }
-    }
-
-    // 그래도 없으면 백업 토큰으로 1회 복원
-    if (!session) {
-      session = await rdRestoreSessionFromBackup();
-    }
-
-    if (session?.user) {
-      rdBackupSession(session);
-      rdStartSessionKeepAlive();
-
-      const isAllowed = await rdVerifyAccess(session.user);
-
-      if (isAllowed === true) {
-        rdRefreshCloudStatus(session.user);
-      } else {
-        rdRefreshCloudStatus(null);
-      }
-    } else {
-      rdRefreshCloudStatus(null);
-    }
-  } catch (err) {
-    console.error("rdInitAuth failed:", err);
+/** 13. 인증 상태 변화 감지 */
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === "SIGNED_OUT") {
     rdRefreshCloudStatus(null);
+    return;
   }
+
+  if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+    const user = session?.user || null;
+    if (!user) {
+      rdRefreshCloudStatus(null);
+      return;
+    }
+
+    const allowed = await rdVerifyAccess(user);
+    if (!allowed) {
+      rdRefreshCloudStatus(null);
+      return;
+    }
+
+    rdRefreshCloudStatus(user);
+  }
+});
+
+/** 14. 초기화 */
+async function rdInitAuth() {
+  await rdCleanOauthUrlIfNeeded();
+  await rdUpdateAuthUI();
 }
 
 rdInitAuth();
