@@ -4595,7 +4595,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // OAuth code 교환을 앱 부트스트랩에서 명시적으로 처리해 세션 유실을 방지
+    detectSessionInUrl: false,
     storage: window.localStorage
   }
 });
@@ -4727,6 +4728,10 @@ async function rdSignOut() {
 }
 
 async function rdGetUser() {
+    // 네트워크 지연 시 getUser()가 null을 반환할 수 있어 세션 캐시를 우선 확인
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) return session.user;
+
   const { data: { user } } = await sb.auth.getUser();
   return user || null;
 }
@@ -4868,6 +4873,16 @@ async function rdCleanOauthUrlIfNeeded() {
 (async () => {
   await rdPrepareTabScopedSession();
 
+    // OAuth 복귀 직후 code 파라미터를 명시적으로 세션으로 교환
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has("code")) {
+    const { error: exchangeError } = await sb.auth.exchangeCodeForSession(window.location.href);
+    if (exchangeError) {
+      console.error("OAuth code exchange error:", exchangeError);
+    }
+    await rdCleanOauthUrlIfNeeded();
+  }
+
   // 1. 최초 1회만 세션을 가져옵니다.
   const { data: { session }, error: sessionError } = await sb.auth.getSession();
 
@@ -4883,11 +4898,8 @@ async function rdCleanOauthUrlIfNeeded() {
       rdRefreshCloudStatus(session.user);
       rdStartSessionKeepAlive();
       
-      // 3. OAuth 복귀 처리 (이미 위에서 session을 확인했으므로 내부 호출 없이 URL만 정리)
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.has("code")) {
-        await rdCleanOauthUrlIfNeeded();
-      }
+      // 로그인 직후 불러오기 버튼이 실패하지 않도록 자동 1회 동기화
+      await rdCloudPullAuto();
     }
   } else {
     rdRefreshCloudStatus(null);
