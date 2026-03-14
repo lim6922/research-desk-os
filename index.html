@@ -4671,8 +4671,23 @@ function rdRefreshCloudStatus(user) {
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     rdStartSessionKeepAlive();
+
     const isAllowed = await rdVerifyAccess(session.user);
-    if (isAllowed) rdRefreshCloudStatus(session.user);
+    if (!isAllowed) return;
+
+    rdRefreshCloudStatus(session.user);
+
+    // 최초 로그인 직후 자동 불러오기
+    if (event === "SIGNED_IN") {
+      setTimeout(async () => {
+        try {
+          await rdCloudPull();
+        } catch (err) {
+          console.error("자동 불러오기 실패:", err);
+        }
+      }, 300);
+    }
+
   } else {
     rdRefreshCloudStatus(null);
   }
