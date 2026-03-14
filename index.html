@@ -3032,67 +3032,91 @@ async function webMapTickerReport() {
 
 
 async function fetchQuote(ticker) {
+  async function tryFetch(symbol) {
+    const targetUrl =
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&_t=${Date.now()}`;
 
-async function tryFetch(symbol) {
-  const targetUrl =
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&_t=${Date.now()}`;
+    // 1차: corsproxy.io
+    try {
+      const res = await fetch(
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+        { cache: "no-store" }
+      );
 
-  // 1차: corsproxy.io
-  try {
-    const res = await fetch(
-      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-      { cache: "no-store" }
-    );
+      if (res.ok) {
+        const data = await res.json();
+        const result = data?.chart?.result?.[0];
+        const timestamps = result?.timestamp || [];
+        const closes = result?.indicators?.quote?.[0]?.close || [];
 
-    if (res.ok) {
-      const data = await res.json();
-      const result = data?.chart?.result?.[0];
-      const timestamps = result?.timestamp || [];
-      const closes = result?.indicators?.quote?.[0]?.close || [];
+        let lastIndex = closes.length - 1;
+        while (lastIndex >= 0 && closes[lastIndex] == null) lastIndex--;
 
-      let lastIndex = closes.length - 1;
-      while (lastIndex >= 0 && closes[lastIndex] == null) lastIndex--;
-
-      if (lastIndex >= 0 && typeof closes[lastIndex] === "number") {
-        return {
-          price: closes[lastIndex],
-          time: timestamps[lastIndex] * 1000
-        };
+        if (lastIndex >= 0 && typeof closes[lastIndex] === "number") {
+          return {
+            price: closes[lastIndex],
+            time: timestamps[lastIndex] * 1000
+          };
+        }
       }
+    } catch (err) {
+      console.warn("corsproxy failed:", symbol, err);
     }
-  } catch (err) {
-    console.warn("corsproxy failed:", symbol, err);
+
+    // 2차: allorigins
+    try {
+      const res = await fetch(
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+        { cache: "no-store" }
+      );
+
+      if (res.ok) {
+        const json = await res.json();
+        const data = JSON.parse(json.contents);
+        const result = data?.chart?.result?.[0];
+        const timestamps = result?.timestamp || [];
+        const closes = result?.indicators?.quote?.[0]?.close || [];
+
+        let lastIndex = closes.length - 1;
+        while (lastIndex >= 0 && closes[lastIndex] == null) lastIndex--;
+
+        if (lastIndex >= 0 && typeof closes[lastIndex] === "number") {
+          return {
+            price: closes[lastIndex],
+            time: timestamps[lastIndex] * 1000
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("allorigins failed:", symbol, err);
+    }
+
+    return null;
   }
 
-  // 2차: allorigins
   try {
-    const res = await fetch(
-      `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-      { cache: "no-store" }
-    );
+    // 숫자 코드 = 국내 종목
+    if (/^\d+$/.test(ticker)) {
+      let quote = await tryFetch(ticker + ".KS");
+      if (quote) return quote;
 
-    if (res.ok) {
-      const json = await res.json();
-      const data = JSON.parse(json.contents);
-      const result = data?.chart?.result?.[0];
-      const timestamps = result?.timestamp || [];
-      const closes = result?.indicators?.quote?.[0]?.close || [];
+      quote = await tryFetch(ticker + ".KQ");
+      if (quote) return quote;
 
-      let lastIndex = closes.length - 1;
-      while (lastIndex >= 0 && closes[lastIndex] == null) lastIndex--;
-
-      if (lastIndex >= 0 && typeof closes[lastIndex] === "number") {
-        return {
-          price: closes[lastIndex],
-          time: timestamps[lastIndex] * 1000
-        };
-      }
+      return null;
     }
-  } catch (err) {
-    console.warn("allorigins failed:", symbol, err);
-  }
 
-  return null;
+    // 확장자 포함
+    if (ticker.includes(".")) {
+      return await tryFetch(ticker);
+    }
+
+    // 해외 종목
+    return await tryFetch(ticker);
+  } catch (err) {
+    console.error(`시세 조회 실패 (${ticker}):`, err);
+    return null;
+  }
 }
 
 async function syncQuotes() {
@@ -3102,14 +3126,13 @@ async function syncQuotes() {
   let updated = 0;
 
   for (const ticker of tickers) {
-
     const quote = await fetchQuote(ticker);
 
-    if (quote !== null) {
+    if (quote) {
       db.entries.forEach(e => {
         if (e.tickerCode === ticker) {
           e.currentPrice = quote.price;
-          e.quoteTime = quote.time;   // 🔥 시세 기준 시각 저장
+          e.quoteTime = quote.time;
         }
       });
       updated++;
@@ -3128,16 +3151,14 @@ async function syncQuotes() {
 }
 
 async function syncSingleQuote(id) {
-
   const entry = db.entries.find(e => e.id === id);
   if (!entry) return;
 
   const quote = await fetchQuote(entry.tickerCode);
 
-  if (quote !== null) {
-
+  if (quote) {
     entry.currentPrice = quote.price;
-    entry.quoteTime = quote.time;   // 🔥 시세 기준 시각 저장
+    entry.quoteTime = quote.time;
     entry.updatedAt = Date.now();
 
     persist();
@@ -3149,7 +3170,6 @@ async function syncSingleQuote(id) {
       `현재가: ${fmtNum(quote.price)}\n` +
       `기준시각: ${new Date(quote.time).toLocaleString()}`
     );
-
   } else {
     alert("시세 조회에 실패했습니다.");
   }
