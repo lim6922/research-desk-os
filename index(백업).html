@@ -1254,7 +1254,11 @@ Research Desk는 단순 메모장이 아니라,<br>
 <b style="color:var(--text);">🧩 Markdown 에디터</b><br>
 • Desk의 "핵심 가설" 입력창 하단 버튼으로 제목/링크/코드/표/체크리스트 템플릿을 빠르게 삽입할 수 있습니다.<br>
 • 지원 렌더링: 제목, 굵게/기울임, 인용, 구분선, 목록(순서/비순서), 체크리스트, 링크, 인라인 코드<br><br>
-
+<b style="color:var(--text);">💡 기타 제언</b><br>
+• 캡처/리포트 변경 이력이 누적되므로 주 1회 "JSON 내보내기"로 백업본을 보관하세요.<br>
+• 클라우드 사용 시, 작업 시작 전에 "클라우드 불러오기"로 최신본 동기화 후 작성하면 충돌을 줄일 수 있습니다.<br>
+• 핵심 종목은 Desk 즐겨찾기(고정)와 Explorer 검색어 프리셋을 함께 써서 리서치 루틴을 표준화해보세요.<br><br>
+  
     <button class="btn btn-primary"
             style="margin-top:20px; width:100%;"
             onclick="toggleModal('helpModal')">
@@ -1333,6 +1337,15 @@ Research Desk는 단순 메모장이 아니라,<br>
       <button class="btn btn-primary btn-mini" onclick="savePenToImage()">
         ✏️ 펜 메모 저장
       </button>
+
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-mini" onclick="undoPenStroke()" title="방금 그린 선 지우기">
+          ↩️ 방금 지우기
+        </button>
+        <button class="btn btn-mini" onclick="clearPenCanvas()" title="펜 캔버스 전체 지우기">
+          🧹 전체 지우기
+        </button>
+      </div>
     </div>
 
   </div>
@@ -1635,6 +1648,13 @@ if (e.isAlarm && e.alarm && e.alarm.date) {
   const outgoingLinks = e.links || [];
   const incomingLinks = db.entries.filter(x => (x.links || []).includes(e.id));
   const incoming = getIncomingLinks(e.id);
+  const outgoingBadge = outgoingLinks.length
+    ? `<span class="link-summary"
+              style="background:#dcfce7;color:#166534;"
+              onclick="jumpToNote(${outgoingLinks[0]})">
+         🔗 연결함 ${outgoingLinks.length}
+       </span>`
+    : '';
   const incomingBadge = incoming.length
     ? `<span class="link-summary"
               style="background:#ecfeff;color:#0369a1;"
@@ -1703,6 +1723,7 @@ ${e.tags ? e.tags.split(',').map(t => `
             P ${fmtNum(e.trade.entry)} · T ${fmtNum(e.trade.target)} · S ${fmtNum(e.trade.stop)} · ${e.trade.status}
             ${roi ? ` · ${roi}` : ''}
           </div>` : ''}
+  ${outgoingBadge}
   ${incomingBadge}
       </div>
       <div style="display:flex; gap:6px;">
@@ -3179,7 +3200,9 @@ const penCanvas = document.getElementById('penCanvas');
 const penCtx = penCanvas.getContext('2d');
 
 let drawing = false;
-
+let currentStroke = [];
+let penStrokes = [];
+  
 penCtx.strokeStyle = '#ef4444';
 penCtx.lineWidth = 2;
 penCtx.lineCap = 'round';
@@ -3192,12 +3215,33 @@ function getPos(e) {
   };
 }
 
+  function redrawPenCanvas() {
+  penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
+
+  penStrokes.forEach(stroke => {
+    if (!stroke?.length) return;
+    penCtx.beginPath();
+    penCtx.moveTo(stroke[0].x, stroke[0].y);
+    for (let i = 1; i < stroke.length; i++) {
+      penCtx.lineTo(stroke[i].x, stroke[i].y);
+    }
+    penCtx.stroke();
+  });
+}
+
+function undoPenStroke() {
+  if (!penStrokes.length) return;
+  penStrokes.pop();
+  redrawPenCanvas();
+}
+
 penCanvas.addEventListener('pointerdown', e => {
   // ✅ 손가락 터치는 캔버스가 가로채지 않게 (핀치 줌/스크롤 등)
   if (e.pointerType === 'touch') return;
 
   drawing = true;
   const { x, y } = getPos(e);
+  currentStroke = [{ x, y }];
   penCtx.beginPath();
   penCtx.moveTo(x, y);
 });
@@ -3206,16 +3250,25 @@ penCanvas.addEventListener('pointerdown', e => {
 penCanvas.addEventListener('pointermove', e => {
   if (!drawing) return;
   const { x, y } = getPos(e);
+  currentStroke.push({ x, y });
   penCtx.lineTo(x, y);
   penCtx.stroke();
 });
 
 ['pointerup','pointerleave','pointercancel']
   .forEach(ev =>
-    penCanvas.addEventListener(ev, () => drawing = false)
+    penCanvas.addEventListener(ev, () => {
+      if (drawing && currentStroke.length) {
+        penStrokes.push([...currentStroke]);
+      }
+      drawing = false;
+      currentStroke = [];
+    })
   );
 
 function clearPenCanvas() {
+  penStrokes = [];
+  currentStroke = [];
   penCtx.clearRect(0, 0, penCanvas.width, penCanvas.height);
 }
 
@@ -4540,12 +4593,58 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: 'rd_supabase_auth_v1'
   }
 });
 
 let rdSessionKeepAliveTimer = null;
+const RD_SESSION_BACKUP_KEY = "rd_supabase_session_backup_v1";
 
+function rdBackupSession(session) {
+  try {
+    if (!session?.access_token || !session?.refresh_token) return;
+    localStorage.setItem(RD_SESSION_BACKUP_KEY, JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at || 0,
+      saved_at: Date.now()
+    }));
+  } catch (err) {
+    console.warn("Session backup failed:", err);
+  }
+}
+
+function rdClearSessionBackup() {
+  try { localStorage.removeItem(RD_SESSION_BACKUP_KEY); } catch {}
+}
+
+async function rdRestoreSessionFromBackup() {
+  try {
+    const raw = localStorage.getItem(RD_SESSION_BACKUP_KEY);
+    if (!raw) return null;
+
+    const backup = JSON.parse(raw);
+    if (!backup?.access_token || !backup?.refresh_token) return null;
+
+    const { data, error } = await sb.auth.setSession({
+      access_token: backup.access_token,
+      refresh_token: backup.refresh_token
+    });
+
+    if (error) {
+      console.warn("Session restore failed:", error);
+      return null;
+    }
+
+    return data?.session || null;
+  } catch (err) {
+    console.warn("Session restore exception:", err);
+    return null;
+  }
+}
+  
 function rdStartSessionKeepAlive() {
   if (rdSessionKeepAliveTimer) return;
 
@@ -4571,6 +4670,7 @@ async function rdForceLogout() {
     meta: { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 }
   };
   localStorage.removeItem('rd_v10_5');
+  rdClearSessionBackup();
   
   // Supabase 세션 종료
   await sb.auth.signOut();
@@ -4620,10 +4720,12 @@ function rdRefreshCloudStatus(user) {
 /** 6. 로그인 상태 변경 감지 이벤트 */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
+    rdBackupSession(session);
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     if (isAllowed) rdRefreshCloudStatus(session.user);
   } else {
+    if (event === "SIGNED_OUT") rdClearSessionBackup();
     rdRefreshCloudStatus(null);
   }
 });
@@ -4756,8 +4858,21 @@ async function rdCleanOauthUrlIfNeeded() {
 rdCleanOauthUrlIfNeeded();
 
   (async () => {
-  const { data: { session } } = await sb.auth.getSession();
+  let { data: { session } } = await sb.auth.getSession();
+
+  // 브라우저/환경에 따라 새로고침 직후 세션 복원이 지연되는 경우가 있어 1회 보정
+  if (!session) {
+    const refreshed = await sb.auth.refreshSession();
+    session = refreshed?.data?.session || null;
+  }
+
+  // 일부 환경에서 refreshSession도 비어오는 경우 백업 토큰으로 1회 복원
+  if (!session) {
+    session = await rdRestoreSessionFromBackup();
+  }
+
   if (session?.user) {
+    rdBackupSession(session);
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     rdRefreshCloudStatus(isAllowed ? session.user : null);
