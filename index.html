@@ -4559,35 +4559,42 @@ function collapseTreeToActive(){
 }
 
 
-
 /************************************************-----------
- * Supabase Cloud Sync & Gatekeeper (v260302 Final)
- *************************************************----------*/
+ * Supabase Cloud Sync & Gatekeeper
+ * - Alpha Blotter 방식으로 단순화
+ * - getSession() 기준으로만 인증 판단
+ * - PKCE + detectSessionInUrl 사용
+ ************************************************-----------*/
 
-/** 1. [도움함수] 타임스탬프를 KST 문자열로 변환 (ReferenceError 방지용 최상단 배치) */
+/** 1. KST 표시 헬퍼 */
 function fmtKST(ts) {
   if (!ts || ts === 0) return "-";
   try {
     const d = new Date(Number(ts));
     return d.toLocaleString("ko-KR", {
       timeZone: "Asia/Seoul",
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
       hour12: false
     });
-  } catch(e) { 
-    return "-"; 
+  } catch (e) {
+    return "-";
   }
 }
 
 /** 2. Supabase 설정 */
 const APP_BASE_URL = window.location.origin + window.location.pathname;
 
-// 인라인 onclick 안전장치: 앱 부트스트랩 이전 클릭 시 ReferenceError 방지
+// 인라인 onclick 안전장치
 window.rdSignIn = window.rdSignIn || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
 window.rdSignOut = window.rdSignOut || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
 window.rdCloudPull = window.rdCloudPull || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
 window.rdCloudPush = window.rdCloudPush || (() => alert("앱 초기화 중입니다. 잠시 후 다시 시도해주세요."));
+
 const SUPABASE_URL = "https://cczjumhjtugdhgkmvdyq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemp1bWhqdHVnZGhna212ZHlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MzgzNTMsImV4cCI6MjA4ODAxNDM1M30.tDQXuzzu5o9P-DoEA96q_Uz_Bf8prEtaCAxmoRaoQg8";
 
@@ -4595,22 +4602,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    // OAuth code 교환을 앱 부트스트랩에서 명시적으로 처리해 세션 유실을 방지
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
+    flowType: "pkce",
+    storageKey: "rd-supabase-auth",
     storage: window.localStorage
   }
 });
 
 const RD_TAB_KEY = "rd_tab_alive";
 
-// 기존 내용을 모두 지우고 아래 내용으로 교체하세요.
 async function rdPrepareTabScopedSession() {
-  // 브라우저의 새로고침이나 세션 유지 로직을 방해하지 않도록 설정을 기록만 합니다.
   sessionStorage.setItem(RD_TAB_KEY, "1");
 }
-  
 
-
+/** 3. 세션 keep-alive */
 let rdSessionKeepAliveTimer = null;
 
 function rdStartSessionKeepAlive() {
@@ -4618,10 +4623,12 @@ function rdStartSessionKeepAlive() {
 
   const check = async () => {
     try {
-      // refreshSession() 호출을 제거합니다. 
-      // getSession()은 로컬 캐시를 우선 참조하므로 Lock 충돌 위험이 적습니다.
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) {
+      const { data, error } = await sb.auth.getSession();
+      if (error) {
+        console.warn("Session check failed:", error);
+        return;
+      }
+      if (!data?.session) {
         rdRefreshCloudStatus(null);
       }
     } catch (err) {
@@ -4630,43 +4637,46 @@ function rdStartSessionKeepAlive() {
   };
 
   check();
-  rdSessionKeepAliveTimer = setInterval(check, 10 * 60 * 1000); // 주기적 체크 유지
+  rdSessionKeepAliveTimer = setInterval(check, 10 * 60 * 1000);
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") check();
+    if (document.visibilityState === "visible") {
+      check();
+    }
   });
 }
 
-/** 3. [보안] 강제 초기화 및 로그아웃 */
+/** 4. 강제 로그아웃 */
 async function rdForceLogout() {
-  // 로컬 데이터 즉시 파괴
   db = {
     entries: [],
     reports: [],
     meta: { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 }
   };
-  localStorage.removeItem('rd_v10_5');
-  
-  // Supabase 세션 종료
+
+  localStorage.removeItem("rd_v10_5");
+
   await sb.auth.signOut();
-  
-  // 초기 상태로 페이지 새로고침
+
   window.location.href = APP_BASE_URL;
 }
 
-/** 4. [게이트키퍼] 허용된 사용자인지 확인 */
+/** 5. 허용 계정 검증 */
 async function rdVerifyAccess(user) {
   try {
+    const email = String(user?.email || "").trim().toLowerCase();
+    if (!email) return false;
+
     const { data, error } = await sb
-      .from('allowed_users')
-      .select('email')
-      .eq('email', user.email)
+      .from("allowed_users")
+      .select("email")
+      .eq("email", email)
       .maybeSingle();
 
     if (error) throw error;
 
     if (!data) {
-      alert(`❌ 접근 거부: [${user.email}]은 등록되지 않은 계정입니다.\n관리자에게 승인을 요청하세요.`);
+      alert(`❌ 접근 거부: [${email}]은 등록되지 않은 계정입니다.\n관리자에게 승인을 요청하세요.`);
       await rdForceLogout();
       return false;
     }
@@ -4674,43 +4684,57 @@ async function rdVerifyAccess(user) {
     return true;
   } catch (err) {
     console.error("Access Verification Error:", err);
-
-    // 일시적 네트워크 오류는 세션 유지
     return true;
   }
 }
 
-/** 5. 클라우드 상태 표시 바 업데이트 */
+/** 6. 클라우드 상태 표시 */
 function rdRefreshCloudStatus(user) {
   const el = document.getElementById("cloudFloatStatus");
   if (!el) return;
 
   if (user) {
     el.textContent = `☁️ Verified: ${user.email}`;
-    el.style.color = "#10b981"; // 성공(녹색)
+    el.style.color = "#10b981";
   } else {
     el.textContent = "☁️ local mode";
     el.style.color = "var(--muted)";
   }
 }
 
-/** 6. 로그인 상태 변경 감지 이벤트 */
+/** 7. 세션 기반 사용자 조회 */
+async function rdGetUser() {
+  const { data, error } = await sb.auth.getSession();
+  if (error) return null;
+  return data?.session?.user || null;
+}
+
+/** 8. OAuth URL 정리 */
+function rdCleanOauthUrlIfNeeded() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has("code") || url.searchParams.has("error")) {
+    history.replaceState({}, document.title, APP_BASE_URL);
+  }
+}
+
+/** 9. 인증 상태 변경 감지 */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
-    // 세션이 생기면(로그인 시)
-    rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
-    if (isAllowed) {
-      rdRefreshCloudStatus(session.user);
+    if (!isAllowed) return;
+
+    rdRefreshCloudStatus(session.user);
+    rdStartSessionKeepAlive();
+
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      await rdCloudPullAuto();
     }
   } else {
-    // 세션이 없으면(로그아웃 시)
     rdRefreshCloudStatus(null);
   }
 });
 
-/** 7. 클라우드 서비스 함수들 */
-
+/** 10. 로그인 */
 async function rdSignIn() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: "google",
@@ -4719,41 +4743,37 @@ async function rdSignIn() {
       queryParams: { prompt: "select_account" }
     }
   });
-  if (error) alert("로그인 실패: " + error.message);
+
+  if (error) {
+    alert("로그인 실패: " + error.message);
+  }
 }
 
+/** 11. 로그아웃 */
 async function rdSignOut() {
   if (!confirm("로그아웃 하시겠습니까?\n로그아웃 시 현재 브라우저의 데이터는 모두 초기화(삭제)됩니다.")) return;
   await rdForceLogout();
 }
 
-async function rdGetUser() {
-    // 네트워크 지연 시 getUser()가 null을 반환할 수 있어 세션 캐시를 우선 확인
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) return session.user;
-
-  const { data: { user } } = await sb.auth.getUser();
-  return user || null;
-}
-
+/** 12. 클라우드 업로드 */
 async function rdCloudPush() {
   const user = await rdGetUser();
   if (!user) return alert("먼저 로그인하세요.");
 
-  // [보안 추가] 업로드 직전 화이트리스트 실시간 재검증
   const { data: isAllowed, error: authError } = await sb
-    .from('allowed_users')
-    .select('email')
-    .eq('email', user.email)
+    .from("allowed_users")
+    .select("email")
+    .eq("email", String(user.email || "").trim().toLowerCase())
     .maybeSingle();
 
   if (authError || !isAllowed) {
     alert(`❌ 허용되지 않은 계정입니다.\n관리자에게 [${user.email}] 승인을 요청하세요.`);
-    await rdForceLogout(); // 즉시 퇴출
+    await rdForceLogout();
     return;
   }
 
   const dataVer = Number(getLocalDataLastTs() || 0);
+
   const payload = {
     user_id: user.id,
     data: db,
@@ -4764,10 +4784,11 @@ async function rdCloudPush() {
   const ok = confirm(`☁️ 업로드(클라우드 덮어쓰기)\n로컬 데이터 시점: ${fmtKST(dataVer)}\n진행할까요?`);
   if (!ok) return;
 
-  const { error } = await sb.from("rd_snapshots").upsert(payload, { onConflict: "user_id" });
-  
+  const { error } = await sb
+    .from("rd_snapshots")
+    .upsert(payload, { onConflict: "user_id" });
+
   if (error) {
-    // DB의 RLS 정책에 의해 걸러질 경우
     if (error.message.includes("row-level security") || error.code === "42501") {
       alert("❌ 보안 정책에 의해 거부되었습니다. (화이트리스트 계정이 아님)");
       await rdForceLogout();
@@ -4780,11 +4801,11 @@ async function rdCloudPush() {
   db.meta.lastExportAt = dataVer;
   persist();
   updateSyncStatus();
+
   alert("☁️ 업로드 완료\n시점: " + fmtKST(dataVer));
 }
 
-
-
+/** 13. 클라우드 수동 불러오기 */
 async function rdCloudPull() {
   const user = await rdGetUser();
   if (!user) return alert("먼저 로그인하세요.");
@@ -4804,8 +4825,10 @@ async function rdCloudPull() {
     }
     return;
   }
-  
-  if (!data) return alert("클라우드에 저장된 데이터가 없습니다.");
+
+  if (!data) {
+    return alert("클라우드에 저장된 데이터가 없습니다.");
+  }
 
   const remoteVer = Number(data.data_version || 0);
   const msg = `☁️ 클라우드 데이터를 불러올까요?\n(로컬 데이터가 삭제됩니다)\n\nCloud 데이터 시점: ${fmtKST(remoteVer)}`;
@@ -4813,7 +4836,9 @@ async function rdCloudPull() {
   if (!confirm(msg)) return;
 
   db = data.data;
-  if (!db.meta) db.meta = { lastImportAt:0, lastExportAt:0, lastQuoteSyncAt:0 };
+  if (!db.meta) {
+    db.meta = { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 };
+  }
 
   db.meta.lastImportAt = remoteVer;
   db.meta.lastExportAt = remoteVer;
@@ -4827,6 +4852,7 @@ async function rdCloudPull() {
   alert("☁️ 불러오기 완료\n기준시각: " + fmtKST(remoteVer));
 }
 
+/** 14. 클라우드 자동 불러오기 */
 async function rdCloudPullAuto() {
   const user = await rdGetUser();
   if (!user) return;
@@ -4847,7 +4873,9 @@ async function rdCloudPullAuto() {
   const remoteVer = Number(data.data_version || 0);
 
   db = data.data;
-  if (!db.meta) db.meta = { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 };
+  if (!db.meta) {
+    db.meta = { lastImportAt: 0, lastExportAt: 0, lastQuoteSyncAt: 0 };
+  }
 
   db.meta.lastImportAt = remoteVer;
   db.meta.lastExportAt = remoteVer;
@@ -4860,58 +4888,43 @@ async function rdCloudPullAuto() {
 
   console.log("자동 불러오기 완료:", fmtKST(remoteVer));
 }
-  
-/** 8. URL 정리 (OAuth 리다이렉트 파라미터 삭제) */
-async function rdCleanOauthUrlIfNeeded() {
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has("code") || urlParams.has("error")) {
-    // 세션 확인 없이 기록(history)만 교체하여 충돌 방지
-    history.replaceState(null, "", APP_BASE_URL);
-  }
-}
 
+/** 15. 초기 부트스트랩 */
 (async () => {
   await rdPrepareTabScopedSession();
 
-    // OAuth 복귀 직후 code 파라미터를 명시적으로 세션으로 교환
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has("code")) {
-    const { error: exchangeError } = await sb.auth.exchangeCodeForSession(window.location.href);
-    if (exchangeError) {
-      console.error("OAuth code exchange error:", exchangeError);
-    }
-    await rdCleanOauthUrlIfNeeded();
-  }
+  const { data, error } = await sb.auth.getSession();
 
-  // 1. 최초 1회만 세션을 가져옵니다.
-  const { data: { session }, error: sessionError } = await sb.auth.getSession();
-
-  if (sessionError) {
-    console.error("Initial session fetch error:", sessionError);
-  }
-
-  if (session?.user) {
-    // 2. 권한 확인 (이 과정에서 발생하는 Lock 충돌 방지)
-    const isAllowed = await rdVerifyAccess(session.user);
-    
-    if (isAllowed) {
-      rdRefreshCloudStatus(session.user);
-      rdStartSessionKeepAlive();
-      
-      // 로그인 직후 불러오기 버튼이 실패하지 않도록 자동 1회 동기화
-      await rdCloudPullAuto();
-    }
-  } else {
+  if (error) {
+    console.error("Initial session fetch error:", error);
     rdRefreshCloudStatus(null);
+    updateSyncStatus();
+  } else {
+    const session = data?.session || null;
+
+    if (session?.user) {
+      const isAllowed = await rdVerifyAccess(session.user);
+      if (isAllowed) {
+        rdRefreshCloudStatus(session.user);
+        rdStartSessionKeepAlive();
+        await rdCloudPullAuto();
+      }
+    } else {
+      rdRefreshCloudStatus(null);
+    }
+
+    updateSyncStatus();
   }
 
-  updateSyncStatus();
+  rdCleanOauthUrlIfNeeded();
 })();
 
+/** 16. 전역 바인딩 */
 window.rdSignIn = rdSignIn;
 window.rdSignOut = rdSignOut;
 window.rdCloudPull = rdCloudPull;
 window.rdCloudPush = rdCloudPush;
+
   
 </script>
 </body>
