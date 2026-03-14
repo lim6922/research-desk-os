@@ -4602,27 +4602,10 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const RD_TAB_KEY = "rd_tab_alive";
 
+// 기존 내용을 모두 지우고 아래 내용으로 교체하세요.
 async function rdPrepareTabScopedSession() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const isOauthReturn = urlParams.has("code") || urlParams.has("error");
-
-  const navEntry = performance.getEntriesByType("navigation")[0];
-  const navType = navEntry?.type || "";
-  const isReloadLike = navType === "reload" || navType === "back_forward";
-
-  const hadTabSession = sessionStorage.getItem(RD_TAB_KEY) === "1";
-
-  // 현재 탭 생존 표시
+  // 브라우저의 새로고침이나 세션 유지 로직을 방해하지 않도록 설정을 기록만 합니다.
   sessionStorage.setItem(RD_TAB_KEY, "1");
-
-  // OAuth 복귀 / 새로고침 / bfcache 복원은 세션 유지
-  if (isOauthReturn || isReloadLike) return;
-
-  // NOTE:
-  // 일부 브라우저(iOS Safari/웹뷰)에서는 navigation type, sessionStorage 동작이 불안정해서
-  // 정상 새로고침/재진입에서도 hadTabSession이 false로 떨어지는 경우가 있어 세션이 풀리는 문제가 발생했다.
-  // 로그인 유지 안정성을 위해 자동 signOut 로직은 비활성화한다.
-  if (!hadTabSession) return;
 }
   
 
@@ -4715,29 +4698,14 @@ function rdRefreshCloudStatus(user) {
 /** 6. 로그인 상태 변경 감지 이벤트 */
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
+    // 세션이 생기면(로그인 시)
     rdStartSessionKeepAlive();
-
     const isAllowed = await rdVerifyAccess(session.user);
-    if (!isAllowed) return;
-
-    rdRefreshCloudStatus(session.user);
-
-    // OAuth 로그인 직후에만 자동 불러오기
-    if (event === "SIGNED_IN") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isOauthReturn = urlParams.has("code") || urlParams.has("error");
-
-      if (isOauthReturn) {
-        setTimeout(async () => {
-          try {
-            await rdCloudPullAuto();
-          } catch (err) {
-            console.error("자동 불러오기 실패:", err);
-          }
-        }, 300);
-      }
+    if (isAllowed) {
+      rdRefreshCloudStatus(session.user);
     }
   } else {
+    // 세션이 없으면(로그아웃 시)
     rdRefreshCloudStatus(null);
   }
 });
@@ -4902,17 +4870,35 @@ async function rdCleanOauthUrlIfNeeded() {
 }
 
 (async () => {
+  // 1. 탭 상태 기록 (새로고침 인식용)
   await rdPrepareTabScopedSession();
-  await rdCleanOauthUrlIfNeeded();
 
+  // 2. Supabase로부터 현재 세션(로그인 정보)을 가져올 때까지 기다림
   const { data: { session } } = await sb.auth.getSession();
+
   if (session?.user) {
+    // 3. 로그인 정보가 있다면 권한 확인 후 UI 업데이트
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
-    rdRefreshCloudStatus(isAllowed ? session.user : null);
+    
+    if (isAllowed) {
+      rdRefreshCloudStatus(session.user);
+      
+      // 만약 방금 구글 로그인을 하고 돌아온 화면이라면 URL을 깔끔하게 청소
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has("code")) {
+        await rdCleanOauthUrlIfNeeded();
+        // 로그인 직후 데이터 자동 불러오기 (선택 사항)
+        // await rdCloudPullAuto(); 
+      }
+    }
   } else {
+    // 4. 로그인 정보가 없다면 로컬 모드로 표시
     rdRefreshCloudStatus(null);
   }
+
+  // UI 데이터 동기화 상태 업데이트
+  updateSyncStatus();
 })();
 
 window.rdSignIn = rdSignIn;
