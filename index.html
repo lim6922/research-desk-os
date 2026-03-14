@@ -4590,17 +4590,40 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: window.sessionStorage
+    storage: window.localStorage
   }
 });
+
+const RD_TAB_KEY = "rd_tab_alive";
+
+async function rdPrepareTabScopedSession() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isOauthReturn = urlParams.has("code") || urlParams.has("error");
+
+  const hadTabSession = sessionStorage.getItem(RD_TAB_KEY) === "1";
+
+  // 현재 탭이 살아있다는 표시
+  sessionStorage.setItem(RD_TAB_KEY, "1");
+
+  // OAuth 로그인 리다이렉트 복귀 중이면 로그아웃 처리 금지
+  if (isOauthReturn) return;
+
+  // 새 탭/새 창으로 처음 열린 경우: 기존 localStorage 세션이 있더라도 강제 로그아웃
+  if (!hadTabSession) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      await sb.auth.signOut();
+    }
+  }
+}
+  
 
 let rdSessionKeepAliveTimer = null;
 
 function rdStartSessionKeepAlive() {
   if (rdSessionKeepAliveTimer) return;
 
-  // 로그인 세션이 짧게 끊기지 않도록 30분마다 토큰 갱신 시도
-  rdSessionKeepAliveTimer = setInterval(async () => {
+  const refresh = async () => {
     try {
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
@@ -4609,7 +4632,18 @@ function rdStartSessionKeepAlive() {
     } catch (err) {
       console.warn("Session keep-alive failed:", err);
     }
-  }, 30 * 60 * 1000);
+  };
+
+  refresh();
+  rdSessionKeepAliveTimer = setInterval(refresh, 10 * 60 * 1000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refresh();
+  });
+
+  window.addEventListener("focus", refresh);
+  window.addEventListener("pageshow", refresh);
+  window.addEventListener("online", refresh);
 }
 
 /** 3. [보안] 강제 초기화 및 로그아웃 */
@@ -4818,14 +4852,17 @@ async function rdCleanOauthUrlIfNeeded() {
   }
 }
 
-rdCleanOauthUrlIfNeeded();
+(async () => {
+  await rdPrepareTabScopedSession();
+  await rdCleanOauthUrlIfNeeded();
 
-  (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
     rdStartSessionKeepAlive();
     const isAllowed = await rdVerifyAccess(session.user);
     rdRefreshCloudStatus(isAllowed ? session.user : null);
+  } else {
+    rdRefreshCloudStatus(null);
   }
 })();
 
